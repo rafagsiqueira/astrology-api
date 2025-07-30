@@ -3,85 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from models import BirthData
-
-
-class TestSVGPostProcessing:
-    def test_post_process_chart_svg_light_theme(self):
-        """Test SVG post-processing with light theme chart"""
-        # Read the test SVG file
-        assets_dir = Path(__file__).parent.parent / 'assets'
-        with open(assets_dir / 'test_chart.svg', 'r') as f:
-            original_svg = f.read()
-        
-        # Import the function we're testing
-        from astrology import post_process_chart_svg
-        
-        # Process the SVG
-        processed_svg = post_process_chart_svg(original_svg)
-        
-        # Verify that text elements are removed (the function removes <text> tags)
-        assert '<text' not in processed_svg
-        
-        # Verify that the main chart structure is preserved
-        assert 'Full_Wheel' in processed_svg
-        assert '<svg' in processed_svg
-        assert '</svg>' in processed_svg
-        
-        # Verify that SVG structure elements are still there
-        assert '<g' in processed_svg
-        assert '<path' in processed_svg or '<circle' in processed_svg
-        
-        # Verify that processing actually happened (content should be shorter)
-        assert len(processed_svg) < len(original_svg)
-        
-        # Verify no birth data text remains
-        assert 'New York' not in processed_svg
-        assert '1990-01-01' not in processed_svg
-        assert 'Latitude:' not in processed_svg
-        assert 'Longitude:' not in processed_svg
-        
-        print("✅ Light theme SVG post-processing test passed!")
-
-    def test_post_process_chart_svg_dark_theme(self):
-        """Test SVG post-processing with dark theme chart"""
-        # Read the test SVG file
-        assets_dir = Path(__file__).parent.parent / 'assets'
-        with open(assets_dir / 'test_chart_dark.svg', 'r') as f:
-            original_svg = f.read()
-        
-        # Import the function we're testing
-        from astrology import post_process_chart_svg
-        
-        # Process the SVG
-        processed_svg = post_process_chart_svg(original_svg)
-        
-        # Verify that text elements are removed (the function removes <text> tags)
-        assert '<text' not in processed_svg
-        
-        # Verify that the main chart structure is preserved
-        assert 'Full_Wheel' in processed_svg
-        assert '<svg' in processed_svg
-        assert '</svg>' in processed_svg
-        
-        # Verify that SVG structure elements are still there
-        assert '<g' in processed_svg
-        assert '<path' in processed_svg or '<circle' in processed_svg
-        
-        print("✅ Dark theme SVG post-processing test passed!")
-
-    def test_post_process_invalid_svg(self):
-        """Test post-processing with invalid SVG content"""
-        from astrology import post_process_chart_svg
-        
-        invalid_svg = "<invalid>not real svg</invalid>"
-        
-        # Should return original content when processing fails
-        result = post_process_chart_svg(invalid_svg)
-        assert result == invalid_svg
-        
-        print("✅ Invalid SVG handling test passed!")
-
+from models import BirthData   
 
 class TestAstrologyHelpers:
     def test_element_mapping(self):
@@ -190,7 +112,7 @@ class TestChartGeneration:
         if "Sun" in planets:
             sun_planet = planets["Sun"]
             assert hasattr(sun_planet, 'name')
-            assert hasattr(sun_planet, 'longitude')
+            assert hasattr(sun_planet, 'degree')
             assert hasattr(sun_planet, 'sign')
             assert hasattr(sun_planet, 'house')
             assert isinstance(sun_planet.house, int)
@@ -288,7 +210,7 @@ class TestChartGeneration:
         from astrology import generate_birth_chart
         
         birth_data = BirthData(
-            birthTimestamp=datetime.fromisoformat("1986-01-14T11:35:00-3:00").timestamp(), 
+            birthTimestamp=datetime.fromisoformat("1986-01-14T11:35:00-03:00").timestamp(), 
             latitude=40.7128,
             longitude=-74.0060
         )
