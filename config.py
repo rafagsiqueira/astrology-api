@@ -37,5 +37,16 @@ CORS_HEADERS = ["*"]
 
 # Logging configuration
 def get_logger(name: str) -> logging.Logger:
-    """Get a logger instance with the specified name."""
-    return logging.getLogger(name)
+	"""Get a logger instance with the specified name."""
+	return logging.getLogger(name)
+
+# Initialize Claude API client
+def get_claude_client():
+	"""Initialize the Claude API client if the API key is set."""
+	try:
+		if ANTHROPIC_API_KEY:
+			import anthropic
+			return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+	except Exception as e:
+		logger.error(f"Failed to initialize Claude API client: {e}")
+	return None

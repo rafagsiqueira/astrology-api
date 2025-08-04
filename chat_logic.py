@@ -14,7 +14,7 @@ from semantic_kernel.contents import ChatHistorySummarizationReducer
 from semantic_kernel.functions import kernel_function
 
 from models import CurrentLocation, BirthData
-from astrology import generate_birth_chart, current_chart, generate_transit
+from astrology import generate_transit
 from config import get_logger, ANTHROPIC_API_KEY
 
 logger = get_logger(__name__)
@@ -61,11 +61,11 @@ class AstrologyPlugin:
             return "Unable to retrieve current transit aspects to your birth chart at this time."
 
 
-def get_semantic_kernel(user_birth_data: Optional[BirthData] = None, current_location: Optional[CurrentLocation] = None) -> Kernel:
+def get_semantic_kernel(birth_data: Optional[BirthData] = None, current_location: Optional[CurrentLocation] = None) -> Kernel:
     """Get or create the semantic kernel instance with optional astrology plugin.
     
     Args:
-        user_birth_data: Optional user birth data for synastry calculations
+        birth_data: Optional user birth data for synastry calculations
         current_location: Optional current location for synastry calculations
         
     Returns:
@@ -94,10 +94,10 @@ def get_semantic_kernel(user_birth_data: Optional[BirthData] = None, current_loc
             raise ValueError("ANTHROPIC_API_KEY not found - cannot initialize semantic kernel")
     
     # Add astrology plugin if birth data and location are provided and plugin not already added
-    if (user_birth_data and current_location and 
+    if (birth_data and current_location and 
         not any(plugin_name == "astrology" for plugin_name in _kernel.plugins.keys())):
         try:
-            astrology_plugin = AstrologyPlugin(user_birth_data, current_location)
+            astrology_plugin = AstrologyPlugin(birth_data, current_location)
             _kernel.add_plugin(astrology_plugin, plugin_name="astrology")
             logger.debug("Astrology plugin added to semantic kernel")
         except Exception as e:
@@ -164,92 +164,6 @@ def validate_user_profile(profile: Optional[Dict[str, Any]]) -> None:
             status_code=400,
             detail=f"Profile is incomplete. Missing: {', '.join(missing_fields)}. Please update your profile."
         )
-
-
-def build_astrological_context(profile: Dict[str, Any], current_location: CurrentLocation) -> tuple[Dict[str, str], Any]:
-    """Build astrological context from user profile and current location.
-    
-    Args:
-        profile: User profile with birth data and optional stored astrological chart
-        current_location: Current location for transit data
-        
-    Returns:
-        Tuple of (context_dict, current_chart) where:
-        - context_dict: Dictionary with birth_chart and current_data strings
-        - current_chart: AstrologicalChart object for current planetary positions
-        
-    Raises:
-        Exception: If chart generation fails
-    """
-    # Use stored astrological chart from profile if available
-    if profile.get('astrological_chart'):
-        from models import AstrologicalChart
-        # Reconstruct the chart object from stored data
-        chart_data = profile['astrological_chart']
-        birth_chart = AstrologicalChart(**chart_data)
-        birth_chart_str = birth_chart.to_string()
-        logger.debug("Using stored astrological chart from profile")
-    else:
-        # Fallback: generate chart if not stored in profile
-        logger.debug("No stored chart found, generating birth chart")
-        
-        birth_data = BirthData(
-            birthTimestamp=profile['birth_timestamp'],
-            latitude=profile['latitude'],
-            longitude=profile['longitude']
-        )
-        
-        birth_chart = generate_birth_chart(birth_data, with_svg=False)
-        birth_chart_str = birth_chart.to_string()
-    
-    # Get current planetary data
-    current_planetary_chart = current_chart(current_location)
-    
-    context_dict = {
-        "birth_chart": birth_chart_str,
-        "current_data": current_planetary_chart.to_string()
-    }
-    
-    return context_dict, current_planetary_chart
-
-
-def build_chat_context(context_data: Optional[Dict[str, str]] = None) -> str:
-    """Build the system context for Claude chat.
-    
-    Args:
-        context_data: Optional astrological context data
-        
-    Returns:
-        Complete context string for Claude
-    """
-    context = (
-        "You are a knowledgeable and friendly astrologer. Engage in natural conversation with the user. "
-        "Respond to greetings, casual questions, and general chat normally without forcing astrological content. "
-        "Only provide astrological insights when the user specifically asks about:\n"
-        "- Life advice, guidance, or personal growth\n"
-        "- Career, relationships, or future planning\n"
-        "- Astrological topics, birth charts, or planetary influences\n"
-        "- Current life situations where cosmic guidance would be helpful\n\n"
-    )
-    
-    if context_data:
-        context += (
-            "ASTROLOGICAL DATA AVAILABLE (only reference when relevant to the user's question):\n"
-            f"Birth Chart: {context_data['birth_chart']}\n"
-            f"Current Planetary Positions: {context_data['current_data']}\n\n"
-            "Only reference this astrological data when the user's question specifically relates to astrology, "
-            "personal guidance, life advice, or cosmic influences. For casual conversation, greetings, or "
-            "general questions, respond naturally without mentioning charts or planetary positions.\n\n"
-        )
-    
-    context += (
-        "IMPORTANT: Always respond in plain text, never JSON format. "
-        "Be conversational, warm, and authentic. Match the user's energy - if they're casual, be casual. "
-        "If they're seeking deep guidance, provide thoughtful astrological insights."
-    )
-    
-    return context
-
 
 def build_chat_history_from_messages(messages: List[Dict[str, str]]) -> ChatHistory:
     """Build Semantic Kernel ChatHistory from message list.
@@ -420,7 +334,7 @@ def create_error_response_data(error_message: str) -> str:
 async def generate_semantic_kernel_streaming_response(
     chat_history: ChatHistory, 
     system_message: str,
-    user_birth_data: Optional[BirthData] = None,
+    birth_data: Optional[BirthData] = None,
     current_location: Optional[CurrentLocation] = None,
     current_chart=None
 ) -> AsyncGenerator[str, None]:
@@ -438,7 +352,7 @@ async def generate_semantic_kernel_streaming_response(
     """
     try:
         # Get the kernel with astrology plugin if birth data is provided
-        kernel = get_semantic_kernel(user_birth_data, current_location)
+        kernel = get_semantic_kernel(birth_data, current_location)
         
         # Get the chat completion service
         chat_completion = get_chat_completion_service()

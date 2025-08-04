@@ -81,7 +81,8 @@ class TestChartGeneration:
         from astrology import generate_birth_chart
         
         birth_data = BirthData(
-            birthTimestamp=datetime.fromisoformat("1990-01-01T12:00Z").timestamp(),
+            birth_date="1990-01-01",
+            birth_time="12:00",
             latitude=40.7128,
             longitude=-74.0060
         )
@@ -123,14 +124,16 @@ class TestChartGeneration:
         
         # Test New York
         ny_data = BirthData(
-            birthTimestamp=datetime.fromisoformat("1990-01-01T12:00Z").timestamp(),
+            birth_date="1990-01-01",
+            birth_time="12:00",
             latitude=40.7128,
             longitude=-74.0060
         )
         
         # Test London
         london_data = BirthData(
-            birthTimestamp=datetime.fromisoformat("1990-01-01T12:00Z").timestamp(),
+            birth_date="1990-01-01",
+            birth_time="12:00",
             latitude=51.5074,
             longitude=-0.1278
         )
@@ -159,7 +162,8 @@ class TestChartGeneration:
         from astrology import generate_birth_chart
         
         birth_data = BirthData(
-            birthTimestamp=datetime.fromisoformat("1990-01-01T12:00Z").timestamp(),
+            birth_date="1990-01-01",
+            birth_time="12:00",
             latitude=40.7128,
             longitude=-74.0060
         )
@@ -183,7 +187,8 @@ class TestChartGeneration:
         from astrology import generate_birth_chart
         
         birth_data = BirthData(
-            birthTimestamp=datetime.fromisoformat("1985-06-15T12:00Z").timestamp(),
+            birth_date="1985-06-15",
+            birth_time="12:00",
             latitude=40.7128,
             longitude=-74.0060
         )
@@ -210,7 +215,8 @@ class TestChartGeneration:
         from astrology import generate_birth_chart
         
         birth_data = BirthData(
-            birthTimestamp=datetime.fromisoformat("1986-01-14T11:35:00-03:00").timestamp(), 
+            birth_date="1986-01-14",
+            birth_time="11:35",
             latitude=40.7128,
             longitude=-74.0060
         )

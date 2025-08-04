@@ -3,10 +3,12 @@
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 from datetime import datetime
+from enum import Enum
 
 class BirthData(BaseModel):
-    """Birth data for astrological chart generation."""
-    birthTimestamp: float
+    """Simplified birth data with date, time, and coordinates."""
+    birth_date: str  # YYYY-MM-DD format
+    birth_time: str  # HH:MM format
     latitude: float
     longitude: float
 
@@ -77,18 +79,56 @@ class PersonalityTrait(BaseModel):
     description: str
     strength: int = Field(ge=1, le=10)
 
+class PersonalityTraitsSection(BaseModel):
+    """Personality traits section with description and key traits."""
+    description: str
+    key_traits: List[str]
+
+class EmotionalNatureSection(BaseModel):
+    """Emotional nature section with description and characteristics."""
+    description: str
+    emotional_characteristics: List[str]
+
+class CommunicationIntellectSection(BaseModel):
+    """Communication and intellect section with description and strengths."""
+    description: str
+    communication_strengths: List[str]
+
+class RelationshipsLoveSection(BaseModel):
+    """Relationships and love section with description and dynamics."""
+    description: str
+    relationship_dynamics: List[str]
+
+class CareerPurposeSection(BaseModel):
+    """Career and purpose section with description and potential."""
+    description: str
+    career_potential: List[str]
+
+class StrengthsChallengesSection(BaseModel):
+    """Strengths and challenges section with separate lists."""
+    strengths: List[str]
+    challenges: List[str]
+
+class LifePathSection(BaseModel):
+    """Life path section with overview and development areas."""
+    overview: str
+    key_development_areas: List[str]
+
 class PersonalityAnalysis(BaseModel):
     """Complete personality analysis based on astrological chart."""
     overview: str
-    strengths: List[PersonalityTrait]
-    challenges: List[PersonalityTrait]
-    relationships: str
-    career: str
-    lifePath: str
+    personality_traits: PersonalityTraitsSection
+    emotional_nature: EmotionalNatureSection
+    communication_and_intellect: CommunicationIntellectSection
+    relationships_and_love: RelationshipsLoveSection
+    career_and_purpose: CareerPurposeSection
+    strengths_and_challenges: StrengthsChallengesSection
+    life_path: LifePathSection
 
 class AnalysisRequest(BaseModel):
     """Request for personality analysis."""
-    birth_timestamp: float
+    birth_date: str  # YYYY-MM-DD format
+    birth_time: str  # HH:MM format
     latitude: float
     longitude: float
 
@@ -131,10 +171,8 @@ class UserProfile(BaseModel):
     email: Optional[str] = None
     birth_date: datetime
     birth_time: str
-    birth_location: str
     latitude: float
     longitude: float
-    timezone: str
     created_at: datetime
     updated_at: datetime
     astrological_chart: Optional[AstrologicalChart] = None
@@ -147,10 +185,8 @@ class PartnerData(BaseModel):
     name: str
     birth_date: datetime
     birth_time: str
-    birth_location: str
     latitude: float
     longitude: float
-    timezone: str
     created_at: datetime
     astrological_chart: Optional[AstrologicalChart] = None
 
@@ -162,13 +198,6 @@ class AddPartnerRequest(BaseModel):
     latitude: float
     longitude: float
 
-class ProfileCreationRequest(BaseModel):
-    """Request to create a new user profile."""
-    birth_date: datetime
-    birth_time: str
-    latitude: float
-    longitude: float
-    timezone: str
 
 class ChatRequest(BaseModel):
     """Request for chat with astrologer."""
@@ -178,25 +207,33 @@ class RelationshipAnalysisRequest(BaseModel):
     """Request for relationship analysis between two people."""
     person1_birth_data: BirthData
     person2_birth_data: BirthData
+    relationship_type: str
 
-class RelationshipScoreResponse(BaseModel):
-    """Relationship compatibility score response."""
-    total_score: int
-    compatibility_level: str  # Based on Discepolo method ranges
-    explanation: str
-    strengths: List[str]
-    challenges: List[str]
-    advice: str
+class RelationshipAnalysis(BaseModel):
+    """Claude's structured analysis content for relationship compatibility."""
+    score: int
+    overview: str
+    compatibility_level: str
+    destiny_signs: str
+    relationship_aspects: list
+    strengths: list
+    challenges: list
+    areas_for_growth: list
+
+class HoroscopePeriod(Enum):
+    WEEK = 'week'
+    MONTH = 'month'
+    YEAR = 'year'
 
 class HoroscopeRequest(BaseModel):
     """Request for personalized horoscope."""
     birth_data: BirthData
-    horoscope_type: str = "daily"  # "daily", "weekly", "monthly"
+    current_location: CurrentLocation
+    horoscope_type: HoroscopePeriod
 
 class HoroscopeResponse(BaseModel):
     """Personalized horoscope response."""
     date: str
-    horoscope_type: str
     content: str
     key_influences: List[str]
     lucky_numbers: Optional[List[int]] = None

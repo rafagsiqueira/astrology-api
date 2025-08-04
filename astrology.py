@@ -1,15 +1,17 @@
 """Astrology module for chart generation."""
 
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union, Tuple
+from datetime import date, timedelta
 from kerykeion import AstrologicalSubject, KerykeionChartSVG
+import pytz
 from timezonefinder import TimezoneFinder
 from config import get_logger
 from models import (
-    BirthData, CurrentLocation, PlanetPosition, HousePosition, 
+    BirthData, CurrentLocation, HoroscopePeriod, PlanetPosition, HousePosition, 
     AstrologicalChart, SignData
 )
-from zoneinfo import ZoneInfo
+from cloud_storage import upload_chart_to_storage, get_chart_from_storage
 
 logger = get_logger(__name__)
 
@@ -59,27 +61,31 @@ def get_ruler(sign: str) -> str:
 
 
 def create_astrological_subject(
-    latitude: float, 
-    longitude: float, 
-    birth_timestamp: float,
-    timezone: str,
-    name: str = "Subject"
+    birth_data: BirthData,
+    name: str = "User",
 ) -> AstrologicalSubject:
-    """Create an AstrologicalSubject from location and optional birth date.
+    """Create an AstrologicalSubject from location and birth timestamp.
     
     Args:
-        latitude: Latitude coordinate
-        longitude: Longitude coordinate  
-        birth_date: Birth timestamp
-        name: Name for the subject
+        birth_data: BirthData object containing date, time, and coordinates
         
     Returns:
         AstrologicalSubject instance
     """
+
+    timezone = get_timezone_from_coordinates(
+        latitude=birth_data.latitude,
+        longitude=birth_data.longitude
+    )
+
+    tz = pytz.timezone(timezone)
     
-    date = datetime.fromtimestamp(birth_timestamp)
+    # Convert timestamp to timezone-aware datetime in the specified timezone
+    # This ensures we get the correct local time for the birth location
+    date = datetime.fromisoformat(f"{birth_data.birth_date} {birth_data.birth_time}")
+    logger.debug(f"Creating AstrologicalSubject with timezone: {timezone}, local_date: {date}")
     
-    # Create astrological subject
+    # Create astrological subject using local time components
     return AstrologicalSubject(
         name=name,
         year=date.year,
@@ -87,60 +93,102 @@ def create_astrological_subject(
         day=date.day,
         hour=date.hour,
         minute=date.minute,
-        lat=latitude,
-        lng=longitude,
+        lat=birth_data.latitude,
+        lng=birth_data.longitude,
         tz_str=timezone
     )
 
-def generate_transit(user_birth_data: BirthData, current_location: CurrentLocation) -> List[Dict[str, Any]]:
-    """Generate transit aspects between user's birth chart and current planetary positions.
+def generate_transits(current_location: CurrentLocation, period: HoroscopePeriod) -> List[AstrologicalSubject]:
+    """Generate AstrologicalSubjects for different time periods based on horoscope type.
     
     Args:
-        user_birth_data: User's birth data
         current_location: Current location for planetary positions
+        period: Horoscope period (WEEK, MONTH, YEAR)
         
     Returns:
-        List of transit aspects
+        List of AstrologicalSubjects for the specified period
     """
-    try:
-        from kerykeion import SynastryAspects
-        
-        # Generate both subjects
-        user_tz = get_timezone_from_coordinates(user_birth_data.latitude, user_birth_data.longitude)
-        user_subject = create_astrological_subject(
-            latitude=user_birth_data.latitude,
-            longitude=user_birth_data.longitude,
-            birth_timestamp=user_birth_data.birthTimestamp,
-            timezone=user_tz,
-            name="User"
-        )
+    try:        
         current_tz = get_timezone_from_coordinates(current_location.latitude, current_location.longitude)
-        current_subject = create_astrological_subject(
-            latitude=current_location.latitude,
-            longitude=current_location.longitude,
-            birth_timestamp=datetime.now(ZoneInfo(current_tz)).timestamp(),
-            timezone=current_tz
-        )
+        tz = pytz.timezone(current_tz)
 
-        kerykeion_chart = KerykeionChartSVG(
-            first_obj=user_subject,
-            second_obj=current_subject,
-            chart_type="Transit",
-            theme="dark",
-        )
-        
-        aspects = SynastryAspects(
-            user_subject,
-            current_subject,
-        ).relevant_aspects
-        
-        return [aspect.model_dump() for aspect in aspects]
+        today = date.today()
+        transits = []
+
+        if period == HoroscopePeriod.WEEK:
+            # Generate one AstrologicalSubject for each of the next 7 days
+            for i in range(7):
+                target_date = today + timedelta(days=i)
+                target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))  # Use noon
+                
+                transit_subject = AstrologicalSubject(
+                    name=f"Transit_Day_{i+1}",
+                    year=target_datetime.year,
+                    month=target_datetime.month,
+                    day=target_datetime.day,
+                    hour=target_datetime.hour,
+                    minute=target_datetime.minute,
+                    lat=current_location.latitude,
+                    lng=current_location.longitude,
+                    tz_str=current_tz
+                )
+                transits.append(transit_subject)
+                
+        elif period == HoroscopePeriod.MONTH:
+            # Generate one AstrologicalSubject every 5 days for the next month (6 subjects)
+            for i in range(0, 30, 5):
+                target_date = today + timedelta(days=i)
+                target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))  # Use noon
+                
+                transit_subject = AstrologicalSubject(
+                    name=f"Transit_Period_{i//5 + 1}",
+                    year=target_datetime.year,
+                    month=target_datetime.month,
+                    day=target_datetime.day,
+                    hour=target_datetime.hour,
+                    minute=target_datetime.minute,
+                    lat=current_location.latitude,
+                    lng=current_location.longitude,
+                    tz_str=current_tz
+                )
+                transits.append(transit_subject)
+                
+        elif period == HoroscopePeriod.YEAR:
+            # Generate one AstrologicalSubject for the 1st day of each month for the next 12 months
+            for i in range(12):
+                # Calculate the target month/year
+                target_month = today.month + i
+                target_year = today.year
+                
+                # Handle year rollover
+                while target_month > 12:
+                    target_month -= 12
+                    target_year += 1
+                
+                # Use 1st day of the month
+                target_date = date(target_year, target_month, 1)
+                target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))  # Use noon
+                
+                transit_subject = AstrologicalSubject(
+                    name=f"Transit_Month_{target_month}",
+                    year=target_datetime.year,
+                    month=target_datetime.month,
+                    day=target_datetime.day,
+                    hour=target_datetime.hour,
+                    minute=target_datetime.minute,
+                    lat=current_location.latitude,
+                    lng=current_location.longitude,
+                    tz_str=current_tz
+                )
+                transits.append(transit_subject)
+
+        return transits
         
     except Exception as e:
-        logger.error(f"Failed to generate synastry: {e}")
+        logger.error(f"Failed to generate transits: {e}")
         return []
 
-def convert_subject_to_chart(subject: AstrologicalSubject, with_svg: bool = True) -> AstrologicalChart:
+def subject_to_chart(subject: AstrologicalSubject, with_svg: bool = True) -> AstrologicalChart:
     """Convert an AstrologicalSubject to an AstrologicalChart."""
     try:
         # Process planets data
@@ -238,14 +286,8 @@ def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> Astrol
     try:
         logger.debug(f"Generating birth chart for coordinates {birth_data.latitude}, {birth_data.longitude}")
         
-        # Use the new generate_user_subject method
-        # Generate both subjects
-        user_tz = get_timezone_from_coordinates(birth_data.latitude, birth_data.longitude)
         user_subject = create_astrological_subject(
-            latitude=birth_data.latitude,
-            longitude=birth_data.longitude,
-            birth_timestamp=birth_data.birthTimestamp,
-            timezone=user_tz,
+            birth_data=birth_data,
             name="User"
         )
 
@@ -261,29 +303,10 @@ def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> Astrol
                 logger.error("SVG generation returned None")
                 svg_content = "<svg><text>Chart generation failed</text></svg>"
         
-        return convert_subject_to_chart(subject=user_subject)
+        return subject_to_chart(subject=user_subject)
         
     except Exception as e:
         logger.error(f"Failed to generate birth chart: {e}")
-        raise
-
-def current_chart(current_location: CurrentLocation) -> AstrologicalChart:
-    """Get current positions using planetary data."""
-    try:
-        logger.debug("Getting current planetary positions...")
-
-        current_tz = get_timezone_from_coordinates(current_location.latitude, current_location.longitude)
-        current_subject = create_astrological_subject(
-            latitude=current_location.latitude,
-            longitude=current_location.longitude,
-            birth_timestamp=datetime.now(ZoneInfo(current_tz)).timestamp(),
-            timezone=current_tz
-        )
-
-        return convert_subject_to_chart(subject=current_subject, with_svg=False)
-        
-    except Exception as e:
-        logger.error(f"Failed to get current planetary positions: {e}")
         raise
 
 def get_timezone_from_coordinates(latitude: float, longitude: float) -> str:

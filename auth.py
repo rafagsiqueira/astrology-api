@@ -1,11 +1,14 @@
 """Authentication module for Firebase integration."""
 
+import os
 import firebase_admin
 from firebase_admin import credentials, auth, firestore
 from fastapi import HTTPException, Header, Depends
 from functools import wraps
-from typing import Optional, Dict, Any
 from config import get_logger, FIRESTORE_DATABASE_ID
+from firebase_admin import credentials
+
+cred = credentials.Certificate(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 
 logger = get_logger(__name__)
 
@@ -22,7 +25,7 @@ def initialize_firebase():
         if not firebase_admin._apps:
             # For development, use Application Default Credentials
             # In production, you should use a service account key file
-            firebase_app = firebase_admin.initialize_app()
+            firebase_app = firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin SDK initialized successfully")
         else:
             firebase_app = firebase_admin.get_app()
@@ -36,11 +39,12 @@ def initialize_firebase():
         if firebase_app:
             # Initialize Firestore client (using default database for now)
             # TODO: Multi-database support requires Firebase Admin SDK 7.0+
-            db = firestore.client()
             if FIRESTORE_DATABASE_ID:
-                logger.info(f"Firestore client initialized (note: using default database, not '{FIRESTORE_DATABASE_ID}' - requires SDK upgrade)")
+                logger.info(f"Using Firestore database ID: {FIRESTORE_DATABASE_ID}")
+                db = firestore.client(database_id=FIRESTORE_DATABASE_ID)
             else:
-                logger.info("Firestore client initialized with default database")
+                logger.warning("FIRESTORE_DATABASE_ID not set, using default database")
+                db = firestore.client()
         else:
             logger.warning("Firestore disabled - Firebase Admin SDK not initialized")
     except Exception as e:
@@ -114,3 +118,18 @@ def get_firestore_client():
 def get_firebase_app():
     """Get the Firebase app instance."""
     return firebase_app
+
+def validate_database_availability(db) -> None:
+    """Validate that database is available.
+    
+    Args:
+        db: Firestore database client
+        
+    Raises:
+        HTTPException: If database is not available
+    """
+    if not db:
+        raise HTTPException(
+            status_code=500, 
+            detail="Database not available"
+        )
