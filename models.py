@@ -46,6 +46,28 @@ class SignData(BaseModel):
     modality: str
     ruling_planet: str
 
+class PlanetAnalysis(BaseModel):
+    """Analysis for a single planetary position."""
+    meaning: str
+    influence: str
+    traits: List[str]
+
+class ChartAnalysis(BaseModel):
+    """Comprehensive chart analysis with detailed planetary interpretations."""
+    sun: PlanetAnalysis
+    moon: PlanetAnalysis
+    mercury: PlanetAnalysis
+    venus: PlanetAnalysis
+    mars: PlanetAnalysis
+    jupiter: PlanetAnalysis
+    saturn: PlanetAnalysis
+    uranus: PlanetAnalysis
+    neptune: PlanetAnalysis
+    pluto: PlanetAnalysis
+    sun_sign: PlanetAnalysis
+    moon_sign: PlanetAnalysis
+    ascendant: PlanetAnalysis
+
 class AstrologicalChart(BaseModel):
     """Complete astrological chart data."""
     planets: Dict[str, PlanetPosition]
@@ -54,6 +76,8 @@ class AstrologicalChart(BaseModel):
     moonSign: SignData
     ascendant: SignData
     chartSvg: str
+    chartImageUrl: Optional[str] = None
+    analysis: Optional[ChartAnalysis] = None
     
     def to_string(self) -> str:
         """Convert to string representation."""

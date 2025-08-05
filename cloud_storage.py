@@ -28,9 +28,9 @@ class CloudStorageService:
             self.client = None
             self.bucket = None
     
-    def _generate_chart_filename(self, user_id: str, birth_data_hash: str) -> str:
+    def _generate_chart_filename(self, birth_data_hash: str) -> str:
         """Generate a unique filename for a chart SVG."""
-        return f"{CHARTS_FOLDER}/{user_id}/{birth_data_hash}.svg"
+        return f"{CHARTS_FOLDER}/{birth_data_hash}.svg"
     
     def _hash_birth_data(self, birth_data: dict) -> str:
         """Generate a hash from birth data for unique identification."""
@@ -38,13 +38,11 @@ class CloudStorageService:
         data_str = f"{birth_data.get('birth_date')}_{birth_data.get('birth_time')}_{birth_data.get('latitude')}_{birth_data.get('longitude')}"
         return hashlib.sha256(data_str.encode()).hexdigest()[:16]
     
-    def upload_chart_svg(self, user_id: str, birth_data: dict, svg_content: str) -> Optional[str]:
+    def upload_chart_svg(self, svg_content: str) -> Optional[str]:
         """
         Upload chart SVG to Cloud Storage and return the public URL.
         
         Args:
-            user_id: The user's Firebase UID
-            birth_data: Dictionary containing birth data for hashing
             svg_content: The SVG content as string
             
         Returns:
@@ -55,18 +53,13 @@ class CloudStorageService:
             return None
             
         try:
-            # Generate unique filename
-            birth_hash = self._hash_birth_data(birth_data)
-            filename = self._generate_chart_filename(user_id, birth_hash)
-            
-            # Check if file already exists
-            blob = self.bucket.blob(filename)
-            if blob.exists():
-                logger.debug(f"Chart already exists: {filename}")
-                blob.make_public()
-                return blob.public_url
+            # Generate unique filename using random UUID
+            import uuid
+            chart_id = str(uuid.uuid4())
+            filename = self._generate_chart_filename(chart_id)
             
             # Upload new file
+            blob = self.bucket.blob(filename)
             blob.upload_from_string(
                 svg_content,
                 content_type='image/svg+xml'
@@ -86,12 +79,11 @@ class CloudStorageService:
             logger.error(f"Unexpected error uploading chart: {e}")
             return None
     
-    def delete_chart_svg(self, user_id: str, birth_data: dict) -> bool:
+    def delete_chart_svg(self, birth_data: dict) -> bool:
         """
         Delete a chart SVG from Cloud Storage.
         
         Args:
-            user_id: The user's Firebase UID
             birth_data: Dictionary containing birth data for hashing
             
         Returns:
@@ -103,7 +95,7 @@ class CloudStorageService:
             
         try:
             birth_hash = self._hash_birth_data(birth_data)
-            filename = self._generate_chart_filename(user_id, birth_hash)
+            filename = self._generate_chart_filename(birth_hash)
             
             blob = self.bucket.blob(filename)
             blob.delete()
@@ -185,9 +177,9 @@ class CloudStorageService:
 cloud_storage_service = CloudStorageService()
 
 
-def upload_chart_to_storage(user_id: str, birth_data: dict, svg_content: str) -> Optional[str]:
+def upload_chart_to_storage(svg_content: str) -> Optional[str]:
     """Convenience function to upload chart SVG."""
-    return cloud_storage_service.upload_chart_svg(user_id, birth_data, svg_content)
+    return cloud_storage_service.upload_chart_svg(svg_content)
 
 
 def get_chart_from_storage(user_id: str, birth_data: dict) -> Optional[str]:

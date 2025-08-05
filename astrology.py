@@ -1,7 +1,7 @@
 """Astrology module for chart generation."""
 
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Union, Tuple
+from typing import List
 from datetime import date, timedelta
 from kerykeion import AstrologicalSubject, KerykeionChartSVG
 import pytz
@@ -260,6 +260,8 @@ def subject_to_chart(subject: AstrologicalSubject, with_svg: bool = True) -> Ast
         
         # Generate SVG if requested
         svg_content = ""
+        chart_image_url = None
+        
         if with_svg:
             try:
                 chart_svg = KerykeionChartSVG(first_obj=subject, chart_type="Natal", theme="dark")
@@ -267,6 +269,19 @@ def subject_to_chart(subject: AstrologicalSubject, with_svg: bool = True) -> Ast
                 logger.debug("Chart SVG generated successfully")
             except Exception as svg_error:
                 logger.error(f"Failed to generate chart SVG: {svg_error}")
+            
+            # Upload SVG to cloud storage if available
+            if svg_content and svg_content != "<svg><text>Chart generation failed</text></svg>":
+                try:
+                    from cloud_storage import upload_chart_to_storage
+                    chart_image_url = upload_chart_to_storage(svg_content)
+                    
+                    if chart_image_url:
+                        logger.debug(f"Chart uploaded to cloud storage: {chart_image_url}")
+                    else:
+                        logger.warning("Failed to upload chart to cloud storage")
+                except Exception as storage_error:
+                    logger.error(f"Error uploading chart to storage: {storage_error}")
         
         return AstrologicalChart(
             planets=planets_dict,
@@ -274,7 +289,8 @@ def subject_to_chart(subject: AstrologicalSubject, with_svg: bool = True) -> Ast
             sunSign=sun_sign,
             moonSign=moon_sign,
             ascendant=ascendant_sign,
-            chartSvg=svg_content
+            chartSvg=svg_content,
+            chartImageUrl=chart_image_url
         )
         
     except Exception as e:
@@ -291,19 +307,7 @@ def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> Astrol
             name="User"
         )
 
-        svg_content = ""
-        if with_svg:
-            logger.debug("Generating chart SVG...")
-            
-            chart_svg = KerykeionChartSVG(user_subject, "Natal", theme="dark")
-            svg_content = chart_svg.makeWheelOnlyTemplate(minify=True, remove_css_variables=True)
-            
-            # Check if SVG generation succeeded
-            if svg_content is None:
-                logger.error("SVG generation returned None")
-                svg_content = "<svg><text>Chart generation failed</text></svg>"
-        
-        return subject_to_chart(subject=user_subject)
+        return subject_to_chart(subject=user_subject, with_svg=with_svg)
         
     except Exception as e:
         logger.error(f"Failed to generate birth chart: {e}")

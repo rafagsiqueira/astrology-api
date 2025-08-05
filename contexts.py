@@ -1,12 +1,163 @@
 from typing import Any, Dict, Optional
 from kerykeion.relationship_score import RelationshipScore
 from astrology import create_astrological_subject, generate_birth_chart, generate_transits
-from models import AnalysisRequest, BirthData, CurrentLocation, HoroscopeRequest, PersonalityAnalysis, RelationshipAnalysis, RelationshipAnalysis, RelationshipAnalysisRequest
+from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, CurrentLocation, HoroscopeRequest, PersonalityAnalysis, RelationshipAnalysis, RelationshipAnalysis, RelationshipAnalysisRequest
 from config import get_logger
 from kerykeion import SynastryAspects
 import json
 
 logger = get_logger(__name__)
+
+def build_birth_chart_context(
+	subject: AstrologicalChart
+) -> str:
+	
+	context = """
+You are an expert astrologer tasked with interpreting a person's astrological chart based on the
+positions of celestial bodies in different houses. You will receive a list of planets (including the
+Sun and Moon) and their corresponding houses. Your job is to explain what it means for each
+celestial body to be in its particular house and how it affects someone's personality.
+
+Here is the list of planet-house combinations:
+
+<planet_houses>
+{$PLANET_HOUSES}
+</planet_houses>
+
+For each planet-house combination in the list:
+
+1. Explain the general meaning of the planet in that specific house.
+2. Describe how this placement influences the person's personality, behaviors, and life experiences.
+3. Provide at least two specific traits or tendencies associated with this placement.
+4. Mention any potential challenges or opportunities that may arise from this placement.
+
+Present your interpretation for each planet-house combination in the following format:
+
+<interpretation>
+<planet_house>[Planet] in [House Number]</planet_house>
+<meaning>[Explanation of the meaning]</meaning>
+<influence>[Description of influence on personality]</influence>
+<traits>
+- [Trait 1]
+- [Trait 2]
+</traits>
+</interpretation>
+
+Also explain the meaning of the sun sign, moon sign and ascendant:
+<interpretation>
+<sign>Either sun, moon or ascendant</sign>
+<meaning>[Explanation of the meaning]</meaning>
+<influence>[Description of influence on personality]</influence>
+<traits>
+- [Trait 1]
+- [Trait 2]
+</traits>
+</interpretation>
+
+Use appropriate astrological terminology and provide detailed explanations that demonstrate your
+expertise as an astrologer. Be sure to consider the unique qualities of each planet and how they
+interact with the energies of their respective houses.
+
+After interpreting all planet-house combinations, conclude with a brief overall summary of the
+person's astrological profile based on these placements. Present this summary in <summary> tags.
+
+Remember to maintain a professional and insightful tone throughout your interpretation, as befitting
+an expert astrologer.
+
+<formatting>
+Output your analysis in pure JSON structure:
+{{
+	"sun": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"moon": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"mercury": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"venus": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"mars": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"jupiter": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"saturn": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"uranus": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"neptune": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"pluto": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"sun_sign": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"moon_sign": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+	"ascendant": {{
+		"meaning": string,
+		"influence": string,
+		"traits": list 
+	}},
+}}
+"""
+	return context.format(PLANET_HOUSES=subject.planets)
+
+def parse_chart_response(response: str) -> ChartAnalysis:
+	"""Parse the structured analysis response from Claude.
+	
+	Args:
+		response: The raw response string from Claude API.
+		
+	Returns:
+		ChartAnalysis: Parsed analysis content.
+
+	Raises:
+		ValueError: If the response format is invalid or parsing fails.
+	"""
+	interpolated_response = "{" + response
+	try:
+		json_data = json.loads(interpolated_response)
+		return ChartAnalysis(**json_data)
+	except json.JSONDecodeError as e:
+		logger.error(f"Failed to parse personality analysis response: {e}")
+		raise ValueError("Invalid response format") from e
+	except Exception as e:
+		logger.error(f"Unexpected error while parsing personality analysis response: {e}")
+		raise ValueError("Error processing personality analysis response") from e
 
 def build_personality_context(
 	request: AnalysisRequest
@@ -90,7 +241,6 @@ Identify key strengths and potential challenges based on the overall chart analy
 Synthesize the information to provide an overview of the individual's potential life path and areas
 for personal growth.
 </life_path>
-</analysis>
 
 Remember to use astrological terminology accurately but also explain concepts in a way that someone
 with basic astrological knowledge can understand. Provide a balanced view, highlighting both

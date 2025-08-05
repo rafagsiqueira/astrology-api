@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from datetime import datetime
 import json
 import traceback
-from contexts import build_astrological_context, build_chat_context, build_horoscope_context, build_personality_context, build_relationship_context, parse_personality_response, parse_relationship_response
+from contexts import build_birth_chart_context, build_chat_context, build_horoscope_context, build_personality_context, build_relationship_context, parse_chart_response, parse_personality_response, parse_relationship_response
 from profile_cache import cache, get_user_profile_cached
 
 from config import get_logger, get_claude_client
@@ -15,7 +15,7 @@ from models import (
     BirthData, AstrologicalChart, CurrentLocation, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
     RelationshipAnalysisRequest, HoroscopeRequest, HoroscopeResponse
 )
-from astrology import generate_birth_chart, generate_transit
+from astrology import generate_birth_chart, generate_transits
 from chat_logic import (
     validate_user_profile,
     generate_semantic_kernel_streaming_response,
@@ -40,12 +40,40 @@ async def generate_chart_endpoint(
 ):
     """Generate an astrological chart from birth data."""
     logger.debug(f"Received birth data: {birth_data}")
+    
+    claude_client = get_claude_client()
+    if not claude_client:
+        raise HTTPException(status_code=503, detail="Personality analysis service not available")
+    
     try:
 
         # Generate the chart
         chart = generate_birth_chart(birth_data)
-        return chart
+
+        context = build_birth_chart_context(chart)
+
+        # Call Claude API with rendered prompt
+        response = claude_client.messages.create(
+            model="claude-3-5-haiku-latest",
+            max_tokens=1000,
+            system="You are an expert astrologer tasked with interpreting a person's astrological chart based on the positions of celestial bodies in different houses. Always answer in JSON format.",
+            messages=[
+                {"role": "user", "content": context},
+                {"role": "assistant", "content": "{"}
+            ]
+        )
         
+        # Parse response - cast to TextBlock to access text attribute
+        from anthropic.types import TextBlock
+        text_block = response.content[0]
+        if isinstance(text_block, TextBlock):
+            analysis = parse_chart_response(text_block.text)
+            logger.debug("Personality analysis completed successfully")
+            chart.analysis = analysis
+        else:
+            raise ValueError(f"Expected TextBlock, got {type(text_block)}")
+        
+        return chart
     except Exception as e:
         logger.error(f"Error generating chart: {e}")
         logger.error(traceback.format_exc())
@@ -175,8 +203,8 @@ async def chat_with_astrologer(
             longitude=profile['longitude']
         )
         
-        context_data, current_chart = build_astrological_context(profile, current_location)
-        system_message = build_chat_context(context_data)
+        # context_data, current_chart = build_astrological_context(profile, current_location)
+        # system_message = build_chat_context(context_data)
         
         # Note: User message already added to chat_history above
         # We'll save the complete state after the assistant responds
@@ -184,48 +212,48 @@ async def chat_with_astrologer(
         # Create streaming response with message storage
         assistant_response = ""
         
-        async def generate_response():
-            nonlocal assistant_response
-            try:
-                async for chunk in generate_semantic_kernel_streaming_response(
-                    chat_history=chat_history,
-                    system_message=system_message,
-                    current_location=current_location,
-                    current_chart=current_chart
-                ):
-                    # Extract text from streaming chunks to build complete response
-                    if '"type": "text_delta"' in chunk:
-                        chunk_data = json.loads(chunk.split('data: ')[1].strip())
-                        if chunk_data.get('type') == 'text_delta':
-                            assistant_response += chunk_data['data']['delta']
+        # async def generate_response():
+        #     nonlocal assistant_response
+        #     try:
+        #         async for chunk in generate_semantic_kernel_streaming_response(
+        #             chat_history=chat_history,
+        #             system_message=system_message,
+        #             current_location=current_location,
+        #             current_chart=current_chart
+        #         ):
+        #             # Extract text from streaming chunks to build complete response
+        #             if '"type": "text_delta"' in chunk:
+        #                 chunk_data = json.loads(chunk.split('data: ')[1].strip())
+        #                 if chunk_data.get('type') == 'text_delta':
+        #                     assistant_response += chunk_data['data']['delta']
                     
-                    yield chunk
+        #             yield chunk
                 
-                # Add assistant response to chat history and save complete state
-                if assistant_response:
-                    assistant_message = ChatMessageContent(
-                        role=AuthorRole.ASSISTANT,
-                        content=assistant_response
-                    )
-                    chat_history.add_message(assistant_message)
+        #         # Add assistant response to chat history and save complete state
+        #         if assistant_response:
+        #             assistant_message = ChatMessageContent(
+        #                 role=AuthorRole.ASSISTANT,
+        #                 content=assistant_response
+        #             )
+        #             chat_history.add_message(assistant_message)
                     
-                    # Save the complete chat history state to Firebase
-                    await save_chat_history_to_firebase(user['uid'], chat_history, db)
+        #             # Save the complete chat history state to Firebase
+        #             await save_chat_history_to_firebase(user['uid'], chat_history, db)
                 
-            except Exception as e:
-                logger.error(f"Error in semantic kernel streaming response: {e}")
-                yield create_error_response_data(str(e))
+        #     except Exception as e:
+        #         logger.error(f"Error in semantic kernel streaming response: {e}")
+        #         yield create_error_response_data(str(e))
         
-        return StreamingResponse(
-            generate_response(), 
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Cache-Control"
-            }
-        )
+        # return StreamingResponse(
+        #     generate_response(), 
+        #     media_type="text/event-stream",
+        #     headers={
+        #         "Cache-Control": "no-cache",
+        #         "Connection": "keep-alive",
+        #         "Access-Control-Allow-Origin": "*",
+        #         "Access-Control-Allow-Headers": "Cache-Control"
+        #     }
+        # )
         
     except Exception as e:
         logger.error(f"Error in chat: {e}")
@@ -247,61 +275,7 @@ async def generate_horoscope(
     try:
         # Generate birth chart for context
         context_data, current_chart = build_horoscope_context(request)
-        
-        horoscope_prompt = f"""As an expert astrologer, create a personalized {request.horoscope_type} horoscope for {today}.
-
-Birth Chart Context:
-- Sun Sign: {chart.sunSign.name} ({chart.sunSign.element}, {chart.sunSign.modality})
-- Moon Sign: {chart.moonSign.name} ({chart.moonSign.element}, {chart.moonSign.modality})
-- Ascendant: {chart.ascendant.name} ({chart.ascendant.element}, {chart.ascendant.modality})
-
-Please provide:
-1. A personalized {request.horoscope_type} horoscope (2-3 paragraphs)
-2. Key astrological influences for today
-3. Practical guidance and advice
-4. Lucky numbers (3-5 numbers)
-5. Lucky colors (2-3 colors)
-
-Format as engaging, insightful guidance that feels personal and actionable. Consider current planetary transits affecting this person's chart."""
-
-        # Call Claude for horoscope generation
-        response = claude_client.messages.create(
-            model="claude-3-5-haiku-20241022",
-            max_tokens=600,
-            messages=[{"role": "user", "content": horoscope_prompt}]
-        )
-        
-        # Parse Claude response
-        from anthropic.types import TextBlock
-        text_block = response.content[0]
-        if isinstance(text_block, TextBlock):
-            horoscope_content = text_block.text
-        else:
-            horoscope_content = "Unable to generate horoscope at this time."
-        
-        # Extract key influences, lucky numbers, and colors from the response
-        # For now, we'll provide defaults and enhance parsing later
-        key_influences = [
-            f"Sun in {chart.sunSign.name}",
-            f"Moon in {chart.moonSign.name}",
-            f"{chart.ascendant.name} Rising"
-        ]
-        
-        lucky_numbers = [7, 13, 21, 28, 35]  # Example numbers
-        lucky_colors = ["Blue", "Green", "Gold"]  # Example colors
-        
-        horoscope_response = HoroscopeResponse(
-            date=today,
-            horoscope_type=request.horoscope_type,
-            content=horoscope_content,
-            key_influences=key_influences,
-            lucky_numbers=lucky_numbers,
-            lucky_colors=lucky_colors
-        )
-        
-        logger.debug(f"Horoscope generated for user: {user['uid']}")
-        return horoscope_response
-        
+    
     except Exception as e:
         logger.error(f"Error generating horoscope: {e}")
         logger.error(traceback.format_exc())

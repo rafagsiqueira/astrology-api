@@ -14,7 +14,7 @@ from semantic_kernel.contents import ChatHistorySummarizationReducer
 from semantic_kernel.functions import kernel_function
 
 from models import CurrentLocation, BirthData
-from astrology import generate_transit
+from astrology import generate_transits
 from config import get_logger, ANTHROPIC_API_KEY
 
 logger = get_logger(__name__)
@@ -43,18 +43,18 @@ class AstrologyPlugin:
         """
         try:
             # Use the new generate_synastry function from astrology.py
-            aspects = generate_transit(self.user_birth_data, self.current_location)
+            # aspects = generate_transits(self.user_birth_data, self.current_location)
             
-            # Format only the aspects
-            if aspects:
-                synastry_info = "Current Transit Aspects:\n\n"
-                for aspect in aspects:
-                    synastry_info += f"• {aspect['p1_name']} (natal) {aspect['aspect']} {aspect['p2_name']} (transit) - Orb: {aspect['orbit']:.1f}°\n"
-            else:
-                synastry_info = "No significant transit aspects found at this time."
+            # # Format only the aspects
+            # if aspects:
+            #     synastry_info = "Current Transit Aspects:\n\n"
+            #     for aspect in aspects:
+            #         synastry_info += f"• {aspect['p1_name']} (natal) {aspect['aspect']} {aspect['p2_name']} (transit) - Orb: {aspect['orbit']:.1f}°\n"
+            # else:
+            #     synastry_info = "No significant transit aspects found at this time."
             
-            logger.debug("Synastry information requested and provided")
-            return synastry_info
+            # logger.debug("Synastry information requested and provided")
+            return ""
             
         except Exception as e:
             logger.error(f"Error getting synastry aspects: {e}")
