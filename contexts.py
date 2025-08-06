@@ -10,47 +10,40 @@ logger = get_logger(__name__)
 
 def build_birth_chart_context(
 	subject: AstrologicalChart
-) -> str:
+) -> tuple[str, str]:
 	
-	context = """
+	cached: str = """
 You are an expert astrologer tasked with interpreting a person's astrological chart based on the
 positions of celestial bodies in different houses. You will receive a list of planets (including the
 Sun and Moon) and their corresponding houses. Your job is to explain what it means for each
 celestial body to be in its particular house and how it affects someone's personality.
-
-Here is the list of planet-house combinations:
-
-<planet_houses>
-{$PLANET_HOUSES}
-</planet_houses>
+Always answer in JSON format.
 
 For each planet-house combination in the list:
 
-1. Explain the general meaning of the planet in that specific house.
-2. Describe how this placement influences the person's personality, behaviors, and life experiences.
-3. Provide at least two specific traits or tendencies associated with this placement.
-4. Mention any potential challenges or opportunities that may arise from this placement.
+1. Describe how this placement influences the person's personality, behaviors, and life experiences.
+2. Provide at least three specific traits or tendencies associated with this placement.
 
 Present your interpretation for each planet-house combination in the following format:
 
 <interpretation>
 <planet_house>[Planet] in [House Number]</planet_house>
-<meaning>[Explanation of the meaning]</meaning>
 <influence>[Description of influence on personality]</influence>
 <traits>
 - [Trait 1]
 - [Trait 2]
+- [Trait 3]
 </traits>
 </interpretation>
 
-Also explain the meaning of the sun sign, moon sign and ascendant:
+Also explain the influence of the sun sign, moon sign and ascendant:
 <interpretation>
 <sign>Either sun, moon or ascendant</sign>
-<meaning>[Explanation of the meaning]</meaning>
 <influence>[Description of influence on personality]</influence>
 <traits>
 - [Trait 1]
 - [Trait 2]
+- [Trait 3]
 </traits>
 </interpretation>
 
@@ -68,73 +61,69 @@ an expert astrologer.
 Output your analysis in pure JSON structure:
 {{
 	"sun": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"moon": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"mercury": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"venus": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"mars": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"jupiter": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"saturn": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"uranus": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"neptune": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"pluto": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"sun_sign": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"moon_sign": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 	"ascendant": {{
-		"meaning": string,
 		"influence": string,
 		"traits": list 
 	}},
 }}
 """
-	return context.format(PLANET_HOUSES=subject.planets)
+	user = """
+Here is the list of planet-house combinations:
+
+<planet_houses>
+{PLANET_HOUSES}
+</planet_houses>
+
+Please provide your analysis.
+"""
+	return (cached, user.replace("{$PLANET_HOUSES}", str(subject.planets)))
 
 def parse_chart_response(response: str) -> ChartAnalysis:
 	"""Parse the structured analysis response from Claude.

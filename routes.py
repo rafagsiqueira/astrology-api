@@ -50,13 +50,19 @@ async def generate_chart_endpoint(
         # Generate the chart
         chart = generate_birth_chart(birth_data)
 
-        context = build_birth_chart_context(chart)
+        (cached, context) = build_birth_chart_context(chart)
 
         # Call Claude API with rendered prompt
         response = claude_client.messages.create(
             model="claude-3-5-haiku-latest",
             max_tokens=1000,
-            system="You are an expert astrologer tasked with interpreting a person's astrological chart based on the positions of celestial bodies in different houses. Always answer in JSON format.",
+            system=[
+                {
+                    "type": "text",
+                    "text": cached,
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
             messages=[
                 {"role": "user", "content": context},
                 {"role": "assistant", "content": "{"}
@@ -70,10 +76,9 @@ async def generate_chart_endpoint(
             analysis = parse_chart_response(text_block.text)
             logger.debug("Personality analysis completed successfully")
             chart.analysis = analysis
+            return chart
         else:
             raise ValueError(f"Expected TextBlock, got {type(text_block)}")
-        
-        return chart
     except Exception as e:
         logger.error(f"Error generating chart: {e}")
         logger.error(traceback.format_exc())

@@ -48,7 +48,6 @@ class SignData(BaseModel):
 
 class PlanetAnalysis(BaseModel):
     """Analysis for a single planetary position."""
-    meaning: str
     influence: str
     traits: List[str]
 
