@@ -46,7 +46,6 @@ images:
 
 # Build options
 options:
-  machineType: 'e2-standard-2'
   diskSizeGb: 100
   logging: CLOUD_LOGGING_ONLY
 
