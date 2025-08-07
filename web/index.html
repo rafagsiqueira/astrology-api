@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Guru - Your Personal Astrology Companion</title>
+    <meta name="description" content="Discover your cosmic potential with personalized astrology insights, birth chart analysis, and AI-powered guidance.">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content="Cosmic Guru - Your Personal Astrology Companion">
+    <meta property="og:description" content="Discover your cosmic potential with personalized astrology insights, birth chart analysis, and AI-powered guidance.">
+    <meta property="og:image" content="/images/cosmic-guru-preview.png">
+    <meta property="og:type" content="website">
+    
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --cosmic-primary: #4A0080;
+            --cosmic-primary-light: #6B1BA3;
+            --cosmic-primary-dark: #3A0066;
+            --cosmic-secondary: #8B5CF6;
+            --cosmic-accent: #A855F7;
+            --cosmic-background: #FEFCFF;
+            --cosmic-surface: #FFFFFF;
+            --cosmic-text: #1F1F1F;
+            --cosmic-text-secondary: #6B7280;
+            --cosmic-border: #E5E7EB;
+            --cosmic-gradient: linear-gradient(135deg, #4A0080 0%, #8B5CF6 50%, #A855F7 100%);
+            --cosmic-gradient-light: linear-gradient(135deg, #F3E8FF 0%, #EDE9FE 100%);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--cosmic-text);
+            background: var(--cosmic-background);
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        header {
+            background: var(--cosmic-surface);
+            box-shadow: 0 2px 20px rgba(74, 0, 128, 0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-size: 1.5rem;
+            color: var(--cosmic-primary);
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--cosmic-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: var(--cosmic-gradient-light);
+            padding: 4rem 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(74, 0, 128, 0.03) 0%, transparent 70%);
+            animation: rotate 30s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 700;
+            color: var(--cosmic-primary);
+            margin-bottom: 1.5rem;
+            line-height: 1.1;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--cosmic-text-secondary);
+            margin-bottom: 2.5rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .download-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 3rem;
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 24px;
+            background: var(--cosmic-primary);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(74, 0, 128, 0.3);
+        }
+
+        .download-btn:hover {
+            background: var(--cosmic-primary-light);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(74, 0, 128, 0.4);
+        }
+
+        .download-btn img {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* App Screenshots */
+        .screenshots {
+            padding: 4rem 0;
+            background: var(--cosmic-surface);
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .section-title h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            color: var(--cosmic-primary);
+            margin-bottom: 1rem;
+        }
+
+        .section-title p {
+            font-size: 1.1rem;
+            color: var(--cosmic-text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .screenshot-carousel {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            align-items: center;
+            overflow-x: auto;
+            padding: 2rem 0;
+            scroll-snap-type: x mandatory;
+        }
+
+        .screenshot {
+            flex: 0 0 300px;
+            height: 600px;
+            background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+            border-radius: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            scroll-snap-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .screenshot::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 4px;
+            background: #000;
+            border-radius: 2px;
+            opacity: 0.3;
+        }
+
+        .screenshot-content {
+            padding: 40px 20px 20px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .screenshot-image {
+            width: 200px;
+            height: 400px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(74, 0, 128, 0.3);
+            background: var(--cosmic-gradient-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .screenshot-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            border-radius: 20px;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            opacity: 0;
+        }
+
+        .screenshot-image img.loaded {
+            opacity: 1;
+        }
+
+        .screenshot:hover .screenshot-image img {
+            transform: scale(1.05);
+        }
+
+        /* Loading state for images */
+        .screenshot-image::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--cosmic-border);
+            border-top-color: var(--cosmic-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .screenshot-image.loaded::before {
+            display: none;
+        }
+
+        .feature-label {
+            font-weight: 600;
+            color: var(--cosmic-primary);
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        /* Reviews Section */
+        .reviews {
+            padding: 4rem 0;
+            background: var(--cosmic-gradient-light);
+            position: relative;
+        }
+
+        .review-carousel {
+            display: flex;
+            gap: 2rem;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 2rem 0;
+            scroll-snap-type: x mandatory;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+            -webkit-overflow-scrolling: touch; /* iOS smooth scrolling */
+            scroll-behavior: smooth;
+        }
+
+        .review-carousel::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+
+        /* Subtle scroll indicator */
+        .reviews::after {
+            content: '→ Scroll for more reviews';
+            position: absolute;
+            bottom: 1rem;
+            right: 2rem;
+            color: var(--cosmic-text-secondary);
+            font-size: 0.9rem;
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .reviews::after {
+                content: '← Swipe for more →';
+                right: 50%;
+                transform: translateX(50%);
+                bottom: 0.5rem;
+            }
+        }
+
+        .review-card {
+            flex: 0 0 350px;
+            background: var(--cosmic-surface);
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(74, 0, 128, 0.1);
+            scroll-snap-align: start;
+            position: relative;
+        }
+
+        .review-stars {
+            color: #FFA500;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .review-text {
+            font-style: italic;
+            color: var(--cosmic-text);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+
+        .review-author {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .review-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--cosmic-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .review-details h4 {
+            color: var(--cosmic-primary);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .review-details p {
+            color: var(--cosmic-text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 4rem 0;
+            background: var(--cosmic-surface);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .feature-card {
+            text-align: center;
+            padding: 2rem;
+            border-radius: 16px;
+            border: 2px solid var(--cosmic-border);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--cosmic-primary);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(74, 0, 128, 0.15);
+        }
+
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--cosmic-gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            color: white;
+            font-size: 2rem;
+        }
+
+        .feature-card h3 {
+            color: var(--cosmic-primary);
+            font-weight: 600;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+
+        .feature-card p {
+            color: var(--cosmic-text-secondary);
+            line-height: 1.6;
+        }
+
+        /* CTA Section */
+        .cta {
+            padding: 4rem 0;
+            background: var(--cosmic-gradient);
+            color: white;
+            text-align: center;
+        }
+
+        .cta h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .cta p {
+            font-size: 1.2rem;
+            margin-bottom: 2.5rem;
+            opacity: 0.9;
+        }
+
+        .cta .download-buttons {
+            margin-bottom: 0;
+        }
+
+        .cta .download-btn {
+            background: white;
+            color: var(--cosmic-primary);
+        }
+
+        .cta .download-btn:hover {
+            background: #f8f9fa;
+            transform: translateY(-2px);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--cosmic-primary-dark);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.8;
+            transition: opacity 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            opacity: 1;
+        }
+
+        /* Mobile-First Responsive Design */
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 16px;
+            }
+
+            .hero {
+                padding: 2rem 0;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+                margin-bottom: 1rem;
+            }
+
+            .hero p {
+                font-size: 1.1rem;
+                margin-bottom: 2rem;
+            }
+
+            .download-buttons {
+                flex-direction: column;
+                gap: 12px;
+                width: 100%;
+            }
+
+            .download-btn {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+                padding: 16px 24px;
+                font-size: 1.1rem;
+            }
+
+            .section-title h2 {
+                font-size: 2rem;
+            }
+
+            .section-title p {
+                font-size: 1rem;
+                padding: 0 10px;
+            }
+
+            /* Mobile-optimized carousels */
+            .screenshot-carousel,
+            .review-carousel {
+                padding: 1rem 0;
+                gap: 1rem;
+                padding-left: 16px;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+
+            .screenshot-carousel::-webkit-scrollbar,
+            .review-carousel::-webkit-scrollbar {
+                display: none;
+            }
+
+            .screenshot {
+                flex: 0 0 260px;
+                height: 520px;
+            }
+
+            .screenshot-image {
+                width: 160px;
+                height: 320px;
+            }
+
+            .review-card {
+                flex: 0 0 300px;
+                padding: 1.5rem;
+            }
+
+            .review-carousel {
+                gap: 1rem;
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+                margin-top: 2rem;
+            }
+
+            .feature-card {
+                padding: 1.5rem;
+            }
+
+            .feature-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5rem;
+            }
+
+            .cta h2 {
+                font-size: 2rem;
+            }
+
+            .cta p {
+                font-size: 1.1rem;
+                padding: 0 10px;
+            }
+
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+                gap: 1.5rem;
+            }
+
+            .footer-links {
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 1.5rem;
+            }
+        }
+
+        @media (max-width: 768px) and (min-width: 481px) {
+            .hero {
+                padding: 3rem 0;
+            }
+
+            .download-buttons {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 1rem;
+            }
+
+            .download-btn {
+                flex: 1;
+                min-width: 200px;
+                max-width: 280px;
+            }
+
+            .screenshot-carousel,
+            .review-carousel {
+                padding-left: 20px;
+            }
+
+            .screenshot {
+                flex: 0 0 300px;
+                height: 580px;
+            }
+
+            .review-card {
+                flex: 0 0 320px;
+            }
+
+            .review-carousel {
+                gap: 1.5rem;
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .features-grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 2rem;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .screenshot-carousel {
+                justify-content: center;
+                overflow: visible;
+            }
+
+            .review-carousel {
+                justify-content: flex-start;
+                padding-left: 2rem;
+                padding-right: 2rem;
+            }
+
+            .review-card {
+                flex: 0 0 350px;
+            }
+        }
+
+        /* Touch improvements for mobile */
+        @media (hover: none) and (pointer: coarse) {
+            .download-btn:hover {
+                transform: none;
+                background: var(--cosmic-primary);
+            }
+
+            .feature-card:hover {
+                transform: none;
+            }
+
+            .review-card {
+                scroll-snap-align: start;
+            }
+            
+            .screenshot {
+                scroll-snap-align: start;
+            }
+
+            /* Larger touch targets */
+            .download-btn {
+                min-height: 48px;
+            }
+
+            /* Better scrolling on iOS */
+            .screenshot-carousel,
+            .review-carousel {
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x mandatory;
+            }
+        }
+
+        /* High DPI displays */
+        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+            .logo-icon,
+            .feature-icon,
+            .review-avatar {
+                image-rendering: -webkit-optimize-contrast;
+                image-rendering: crisp-edges;
+            }
+        }
+
+        /* Reduce animations for users who prefer reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+
+            .hero::before {
+                animation: none;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --cosmic-background: #0F0F23;
+                --cosmic-surface: #1A1A2E;
+                --cosmic-text: #FFFFFF;
+                --cosmic-text-secondary: #B3B3B3;
+                --cosmic-border: #2D2D4A;
+                --cosmic-gradient-light: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%);
+            }
+
+            .screenshot-mockup {
+                background: var(--cosmic-gradient);
+                color: white;
+            }
+
+            .review-card,
+            .feature-card {
+                background: var(--cosmic-surface);
+                border-color: var(--cosmic-border);
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <div class="logo-icon">✨</div>
+                <span>Cosmic Guru</span>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1>Discover Your Cosmic Journey</h1>
+                <p>Unlock the secrets of your birth chart, receive personalized astrological insights, and explore the cosmic forces that shape your life with AI-powered guidance.</p>
+                
+                <div class="download-buttons">
+                    <a href="#" class="download-btn" id="app-store-btn">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z'/%3E%3C/svg%3E" alt="Apple">
+                        Download for iOS
+                    </a>
+                    <a href="#" class="download-btn" id="google-play-btn">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z'/%3E%3C/svg%3E" alt="Google Play">
+                        Download for Android
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- App Screenshots -->
+    <section class="screenshots">
+        <div class="container">
+            <div class="section-title">
+                <h2>Experience Cosmic Insights</h2>
+                <p>See how Cosmic Guru brings personalized astrology to life with beautiful, intuitive design</p>
+            </div>
+            
+            <div class="screenshot-carousel">
+                <div class="screenshot">
+                    <div class="screenshot-content">
+                        <div class="screenshot-image">
+                            <img src="assets/screen1.png" alt="Cosmic Guru Birth Chart Screen" loading="lazy">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="screenshot">
+                    <div class="screenshot-content">
+                        <div class="screenshot-image">
+                            <img src="assets/screen2.png" alt="Cosmic Guru Personality Analysis Screen" loading="lazy">
+                        </div>
+                        <div class="feature-label">Birth chart</div>
+                    </div>
+                </div>
+                
+                <div class="screenshot">
+                    <div class="screenshot-content">
+                        <div class="screenshot-image">
+                            <img src="assets/screen3.png" alt="Cosmic Guru Relationship Analysis Screen" loading="lazy">
+                        </div>
+                        <div class="feature-label">Birth chart explained</div>
+                    </div>
+                </div>
+                
+                <div class="screenshot">
+                    <div class="screenshot-content">
+                        <div class="screenshot-image">
+                            <img src="assets/screen4.png" alt="Cosmic Guru AI Chat Screen" loading="lazy">
+                        </div>
+                        <div class="feature-label">Personality analysis</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- User Reviews -->
+    <section class="reviews">
+        <div class="container">
+            <div class="section-title">
+                <h2>What Our Users Say</h2>
+                <p>Join thousands of people discovering their cosmic potential</p>
+            </div>
+            
+            <div class="review-carousel" id="reviewCarousel">
+                <!-- Reviews will be dynamically inserted here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+        <div class="container">
+            <div class="section-title">
+                <h2>Unlock Your Cosmic Potential</h2>
+                <p>Everything you need to understand your astrological journey</p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔮</div>
+                    <h3>Personalized Birth Chart</h3>
+                    <p>Get your complete astrological chart with detailed planet positions, houses, and aspects based on your exact birth time and location.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI-Powered Insights</h3>
+                    <p>Receive personalized interpretations and guidance powered by advanced AI that understands the nuances of astrological wisdom.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">💕</div>
+                    <h3>Relationship Compatibility</h3>
+                    <p>Discover how your cosmic energies align with friends, family, and romantic partners through detailed synastry analysis.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">💬</div>
+                    <h3>Cosmic Chat</h3>
+                    <p>Ask questions about your life, relationships, and future. Get instant astrological guidance tailored to your unique chart.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🌙</div>
+                    <h3>Transit Tracking</h3>
+                    <p>Stay informed about current planetary movements and how they influence your personal astrological landscape.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⭐</div>
+                    <h3>Daily Guidance</h3>
+                    <p>Receive personalized daily horoscopes and cosmic insights to help you navigate life with stellar wisdom.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <h2>Begin Your Cosmic Journey Today</h2>
+            <p>Download Cosmic Guru and discover the celestial forces that shape your destiny</p>
+            
+            <div class="download-buttons">
+                <a href="#" class="download-btn" id="cta-app-store">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234A0080'%3E%3Cpath d='M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z'/%3E%3C/svg%3E" alt="Apple">
+                    App Store
+                </a>
+                <a href="#" class="download-btn" id="cta-google-play">
+                    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234A0080'%3E%3Cpath d='M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z'/%3E%3C/svg%3E" alt="Google Play">
+                    Google Play
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="logo">
+                    <div class="logo-icon">✨</div>
+                    <span>Cosmic Guru</span>
+                </div>
+                <div class="footer-links">
+                    <a href="#privacy">Privacy Policy</a>
+                    <a href="#terms">Terms of Service</a>
+                    <a href="#support">Support</a>
+                </div>
+            </div>
+            <p style="margin-top: 1rem; opacity: 0.7;">© 2024 Cosmic Guru. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

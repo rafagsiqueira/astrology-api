@@ -228,8 +228,8 @@ class ChatRequest(BaseModel):
 
 class RelationshipAnalysisRequest(BaseModel):
     """Request for relationship analysis between two people."""
-    person1_birth_data: BirthData
-    person2_birth_data: BirthData
+    person1: BirthData
+    person2: BirthData
     relationship_type: str
 
 class RelationshipAnalysis(BaseModel):
@@ -242,6 +242,8 @@ class RelationshipAnalysis(BaseModel):
     strengths: list
     challenges: list
     areas_for_growth: list
+    person1_chart_url: Optional[str] = None
+    person2_chart_url: Optional[str] = None
 
 class HoroscopePeriod(Enum):
     WEEK = 'week'
@@ -261,3 +263,20 @@ class HoroscopeResponse(BaseModel):
     key_influences: List[str]
     lucky_numbers: Optional[List[int]] = None
     lucky_colors: Optional[List[str]] = None
+
+class CompositeAnalysisRequest(BaseModel):
+    """Request for composite chart analysis between two people."""
+    person1_birth_data: BirthData
+    person2_birth_data: BirthData
+
+class CompositeAnalysis(BaseModel):
+    """Complete composite chart analysis."""
+    overview: str
+    relationship_identity: Dict[str, List[str]]
+    emotional_dynamics: Dict[str, List[str]]
+    communication_style: Dict[str, List[str]]
+    love_expression: Dict[str, List[str]]
+    public_image: Dict[str, List[str]]
+    strengths_and_challenges: Dict[str, List[str]]
+    long_term_potential: Dict[str, List[str]]
+    chart_svg_url: Optional[str] = None

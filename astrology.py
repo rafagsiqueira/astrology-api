@@ -4,12 +4,14 @@ from datetime import datetime
 from typing import List
 from datetime import date, timedelta
 from kerykeion import AstrologicalSubject, KerykeionChartSVG
+from kerykeion.composite_subject_factory import CompositeSubjectFactory
+from kerykeion.kr_types.kr_models import CompositeSubjectModel
 import pytz
 from timezonefinder import TimezoneFinder
 from config import get_logger
 from models import (
     BirthData, CurrentLocation, HoroscopePeriod, PlanetPosition, HousePosition, 
-    AstrologicalChart, SignData
+    AstrologicalChart, SignData, CompositeAnalysisRequest
 )
 from cloud_storage import upload_chart_to_storage, get_chart_from_storage
 
@@ -188,7 +190,7 @@ def generate_transits(current_location: CurrentLocation, period: HoroscopePeriod
         logger.error(f"Failed to generate transits: {e}")
         return []
 
-def subject_to_chart(subject: AstrologicalSubject, with_svg: bool = True) -> AstrologicalChart:
+def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_svg: bool = True) -> AstrologicalChart:
     """Convert an AstrologicalSubject to an AstrologicalChart."""
     try:
         # Process planets data
@@ -311,6 +313,36 @@ def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> Astrol
         
     except Exception as e:
         logger.error(f"Failed to generate birth chart: {e}")
+        raise
+
+def generate_composite_chart(request: CompositeAnalysisRequest, with_svg: bool = True) -> AstrologicalChart:
+    """Generate a composite chart from two people's birth data using midpoint method."""
+    try:
+        logger.debug(f"Generating composite chart between two subjects")
+        
+        # Create AstrologicalSubjects for both people
+        person1_subject = create_astrological_subject(
+            birth_data=request.person1_birth_data,
+            name="Person1"
+        )
+        
+        person2_subject = create_astrological_subject(
+            birth_data=request.person2_birth_data,
+            name="Person2"
+        )
+        
+        # Create composite subject using midpoint method
+        composite_factory = CompositeSubjectFactory(person1_subject, person2_subject)
+        composite_subject = composite_factory.get_midpoint_composite_subject_model()
+        
+        # Convert to AstrologicalChart
+        composite_chart = subject_to_chart(subject=composite_subject, with_svg=with_svg)
+        
+        logger.debug("Composite chart generated successfully")
+        return composite_chart
+        
+    except Exception as e:
+        logger.error(f"Failed to generate composite chart: {e}")
         raise
 
 def get_timezone_from_coordinates(latitude: float, longitude: float) -> str:

@@ -82,6 +82,7 @@ pydantic-core==2.33.2
 pydantic-settings==2.10.1
 pyee==13.0.0
 pyjwt==2.10.1
+cryptography==45.0.5
 pylibsrtp==0.12.0
 pymeta3==0.5.1
 pyopenssl==25.1.0

@@ -1,9 +1,9 @@
 from typing import Any, Dict, Optional
-from kerykeion.relationship_score import RelationshipScore
-from astrology import create_astrological_subject, generate_birth_chart, generate_transits
-from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, CurrentLocation, HoroscopeRequest, PersonalityAnalysis, RelationshipAnalysis, RelationshipAnalysis, RelationshipAnalysisRequest
+from astrology import create_astrological_subject, generate_birth_chart, generate_transits, generate_composite_chart
+from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, CurrentLocation, HoroscopeRequest, PersonalityAnalysis, RelationshipAnalysis, RelationshipAnalysis, RelationshipAnalysisRequest, CompositeAnalysisRequest, CompositeAnalysis
 from config import get_logger
 from kerykeion import SynastryAspects
+from kerykeion.kr_types.kr_models import RelationshipScoreModel    
 import json
 
 logger = get_logger(__name__)
@@ -296,21 +296,6 @@ def parse_personality_response(response: str) -> PersonalityAnalysis:
 		logger.error(f"Unexpected error while parsing personality analysis response: {e}")
 		raise ValueError("Error processing personality analysis response") from e
 
-def get_compatibility_level(score: int) -> str:
-    """Get compatibility level based on Discepolo method ranges."""
-    if score <= 5:
-        return "Minimal relationship"
-    elif score <= 10:
-        return "Medium relationship"
-    elif score <= 15:
-        return "Important relationship"
-    elif score <= 20:
-        return "Very important relationship"
-    elif score <= 35:
-        return "Exceptional relationship"
-    else:
-        return "Rare Exceptional relationship"
-
 def build_horoscope_context(
 	request: HoroscopeRequest
 ) -> str:
@@ -373,7 +358,10 @@ resonate with a wide audience.
 	return context.format(HOROSCOPE_TYPE=request.horoscope_type.value, ASTROLOGY_ASPECTS=aspects)
 
 def build_relationship_context(
-	request: RelationshipAnalysisRequest
+	chart_1: AstrologicalChart,
+	chart_2: AstrologicalChart,
+	score: RelationshipScoreModel,
+	relationship_type: str
 ) -> str:
 	"""Build context for relationship analysis request.
 	
@@ -386,28 +374,21 @@ def build_relationship_context(
 		- birth_chart_str: String representation of the birth chart
 	"""
 
-	relationship_type = request.relationship_type
 	if relationship_type not in ["romantic", "friendship", "professional"]:
 		raise ValueError("Invalid relationship type. Must be one of: romantic, friendship, professional.")
-	person1 = create_astrological_subject(request.person1_birth_data, "Person1")
-	person2 = create_astrological_subject(request.person2_birth_data, "Person2")
-	# Use RelationshipScoreFactory for comprehensive analysis
-	score_result = RelationshipScore(person1, person2)
-
-	birth_chart_A = generate_birth_chart(request.person1_birth_data, with_svg=False)
-	birth_chart_B = generate_birth_chart(request.person2_birth_data, with_svg=False)
+	
 	
 	# Extract comprehensive information
 	result = {
-		"total_score": score_result.score,
-		"compatibility_level": get_compatibility_level(score_result.score),
-		"is_destiny_sign": score_result.is_destiny_sign,
-		"relationship_score_aspects": score_result.relevant_aspects
+		"total_score": score.score_value,
+		"is_destiny_sign": score.is_destiny_sign,
+		"compatibility_level": score.score_description,
+		"relationship_score_aspects": score.aspects
 	}
 	
 	# Format aspects as meaningful strings
 	formatted_aspects = []
-	for aspect in score_result.relevant_aspects:
+	for aspect in score.aspects:
 		if isinstance(aspect, dict):
 			# Create a meaningful string representation: "Sun square Moon (4 points)"
 			aspect_str = f"{aspect['p1_name']} {aspect['aspect']} {aspect['p2_name']} ({aspect['points']} points)"
@@ -515,8 +496,8 @@ Output your analysis in pure JSON structure:
 		COMPATIBILITY_LEVEL=result['compatibility_level'],
 		IS_DESTINY_SIGN="Yes" if result['is_destiny_sign'] else "No",
 		SCORE_ASPECTS=", ".join(result['formatted_aspects']),
-		BIRTH_CHART_A=birth_chart_A.to_string(),
-		BIRTH_CHART_B=birth_chart_B.to_string()
+		BIRTH_CHART_A=chart_1.to_string(),
+		BIRTH_CHART_B=chart_2.to_string()
 	)
 
 def parse_relationship_response(response: str) -> RelationshipAnalysis:
@@ -578,3 +559,108 @@ def build_chat_context(context_data: Optional[Dict[str, str]] = None) -> str:
     )
     
     return context
+
+def build_composite_context(
+	composite_chart: AstrologicalChart
+) -> str:
+	"""Build context for composite chart analysis request.
+	
+	Args:
+		composite_chart: AstrologicalChart object containing the composite chart data.
+		
+	Returns:
+		Context string for Claude API with composite chart analysis.
+	"""
+	
+	context = """
+You are an expert astrologer specializing in composite chart analysis. Your task is to analyze a composite chart created from the midpoint method between two individuals' birth charts.
+
+A composite chart represents the essence of the relationship itself - not the individuals, but the dynamic energy that emerges when they come together. Use this composite chart to provide insights into the relationship's core themes, purpose, and potential.
+
+Here is the composite chart you will be analyzing:
+
+<composite_chart>
+{COMPOSITE_CHART}
+</composite_chart>
+
+Analyze the composite chart carefully, paying attention to the following elements:
+1. Composite Sun sign and house position - the core identity and purpose of the relationship
+2. Composite Moon sign and house position - the emotional needs and domestic life of the relationship
+3. Composite Ascendant - how the relationship presents itself to the world
+4. Positions of other planets and their meanings for the relationship dynamic
+5. Important house emphases that show key relationship themes
+6. The overall energy and character of this union
+
+Based on your analysis, provide insights into:
+1. The relationship's core purpose and identity
+2. Emotional dynamics and domestic harmony
+3. Communication patterns within the relationship
+4. How the relationship expresses love and affection
+5. Potential challenges and growth areas
+6. The relationship's public image and social presence
+7. Long-term potential and evolution
+
+Remember that composite charts reveal the relationship's own personality - distinct from either individual's chart.
+
+Structure your response as follows:
+
+<formatting>
+Output your analysis in pure JSON structure:
+{{
+	"overview": string,
+	"relationship_identity": {{
+		"description": string,
+		"key_themes": list,
+	}},
+	"emotional_dynamics": {{
+		"description": string,
+		"emotional_patterns": list,
+	}},
+	"communication_style": {{
+		"description": string,
+		"communication_strengths": list,
+	}},
+	"love_expression": {{
+		"description": string,
+		"love_dynamics": list,
+	}},
+	"public_image": {{
+		"description": string,
+		"social_presence": list,
+	}},
+	"strengths_and_challenges": {{
+		"strengths": list,
+		"challenges": list,
+	}},
+	"long_term_potential": {{
+		"overview": string,
+		"growth_areas": list,
+	}}
+}}
+</formatting>
+"""
+	
+	return context.format(COMPOSITE_CHART=composite_chart.to_string())
+
+def parse_composite_response(response: str) -> CompositeAnalysis:
+	"""Parse the structured composite analysis response from Claude.
+	
+	Args:
+		response: The raw response string from Claude API.
+		
+	Returns:
+		CompositeAnalysis: Parsed analysis content.
+		
+	Raises:
+		ValueError: If the response format is invalid or parsing fails.
+	"""
+	interpolated_response = "{" + response
+	try:
+		json_data = json.loads(interpolated_response)
+		return CompositeAnalysis(**json_data)
+	except json.JSONDecodeError as e:
+		logger.error(f"Failed to parse composite analysis response: {e}")
+		raise ValueError("Invalid response format") from e
+	except Exception as e:
+		logger.error(f"Unexpected error while parsing composite analysis response: {e}")
+		raise ValueError("Error processing composite analysis response") from e
