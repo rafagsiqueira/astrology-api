@@ -27,7 +27,6 @@ USER appuser
 EXPOSE 8080
 
 # Set environment variables
-ENV PORT=8080
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
