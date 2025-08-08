@@ -8,8 +8,6 @@ from functools import wraps
 from config import get_logger, FIRESTORE_DATABASE_ID
 from firebase_admin import credentials
 
-cred = credentials.Certificate(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
-
 logger = get_logger(__name__)
 
 # Firebase app and database globals
@@ -25,6 +23,7 @@ def initialize_firebase():
         if not firebase_admin._apps:
             # For development, use Application Default Credentials
             # In production, you should use a service account key file
+            cred = credentials.Certificate(os.getenv("GOOGLE_APPLICATION_CREDENTIALS")) if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ else None
             firebase_app = firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin SDK initialized successfully")
         else:

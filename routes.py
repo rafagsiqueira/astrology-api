@@ -457,127 +457,23 @@ async def get_daily_transits(
         target_date = datetime.fromisoformat(request.target_date)
         
         # Generate transits for period days starting from target date
-        transit_moments = generate_transits(
+        transits = generate_transits(
             birth_data=request.birth_data,
             current_location=request.current_location,
             start_date=target_date,
             period=request.period
         )
         
-        # Find the transit moment for the exact target date (should be the first one)
-        target_moment = None
-        if transit_moments:
-            target_moment = transit_moments[0]  # First moment should match our target date
+        # Return transits in the expected response format
+        response = DailyTransitResponse(transits=transits)
         
-        # Create transit subject to get retrograding planets
-        transit_birth_data = BirthData(
-            birth_date=target_date.strftime("%Y-%m-%d"),
-            birth_time="12:00",
-            latitude=request.current_location.latitude,
-            longitude=request.current_location.longitude
-        )
-        transit_subject = create_astrological_subject(transit_birth_data)
-        
-        # Extract data from the transit moment
-        active_aspects = []
-        major_transits = []
-        
-        if target_moment and hasattr(target_moment, 'aspects') and target_moment.aspects:
-            for aspect in target_moment.aspects:
-                if hasattr(aspect, 'p1_name') and hasattr(aspect, 'p2_name') and hasattr(aspect, 'aspect'):
-                    aspect_name = f"{aspect.p1_name} {aspect.aspect} {aspect.p2_name}"
-                    active_aspects.append(aspect_name)
-                    major_transits.append(f"Transit {aspect.p1_name} {aspect.aspect} natal {aspect.p2_name}")
-        
-        # Get retrograding planets from transit subject
-        retrograding_planets = []
-        planet_names = ['mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']
-        for planet_name in planet_names:
-            if hasattr(transit_subject, planet_name):
-                planet = getattr(transit_subject, planet_name)
-                if hasattr(planet, 'retrograde') and planet.retrograde:
-                    retrograding_planets.append(planet_name.capitalize())
-        
-        response = DailyTransitResponse(
-            target_date=request.target_date,
-            active_aspects=active_aspects,
-            retrograding_planets=retrograding_planets,
-            major_transits=major_transits
-        )
-        
-        logger.debug("Daily transit data generated successfully")
+        logger.debug(f"Daily transit data generated successfully: {len(transits)} transits")
         return response
         
     except Exception as e:
         logger.error(f"Error generating daily transits: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to generate daily transits: {str(e)}")
-
-@router.post("/api/analyze-daily-horoscope", response_model=DailyHoroscopeResponse)
-async def analyze_daily_horoscope(
-    request: DailyHoroscopeRequest,
-    user: dict = Depends(verify_firebase_token)
-):
-    """Analyze daily horoscope based on transit data."""
-    logger.debug(f"Daily horoscope analysis request from user: {user['uid']} for date: {request.transit_data.target_date}")
-    
-    claude_client = get_claude_client()
-    if not claude_client:
-        raise HTTPException(status_code=503, detail="Horoscope analysis service not available")
-    
-    try:
-        from contexts import build_daily_horoscope_context
-        
-        # Build context for Claude analysis
-        (system, user_message) = build_daily_horoscope_context(
-            birth_data=request.birth_data,
-            transit_data=request.transit_data
-        )
-        
-        # Call Claude API with rendered prompt and analytics tracking
-        response = await call_claude_with_analytics(
-            claude_client=claude_client,
-            endpoint_name="analyze-daily-horoscope",
-            user_id=user['uid'],
-            model="claude-3-5-haiku-latest",
-            max_tokens=1000,
-            system=[
-                {
-                    "type": "text",
-                    "text": system,
-                    "cache_control": {"type": "ephemeral"}
-                }
-            ],
-            messages=[
-                {"role": "user", "content": user_message},
-                {"role": "assistant", "content": "{"}
-            ]
-        )
-        
-        # Parse response
-        from anthropic.types import TextBlock
-        text_block = response.content[0]
-        if isinstance(text_block, TextBlock):
-            import json
-            analysis_data = json.loads("{" + text_block.text)
-            
-            horoscope_response = DailyHoroscopeResponse(
-                target_date=request.transit_data.target_date,
-                horoscope_text=analysis_data.get("horoscope_text", ""),
-                key_themes=analysis_data.get("key_themes", []),
-                energy_level=analysis_data.get("energy_level", "moderate"),
-                focus_areas=analysis_data.get("focus_areas", [])
-            )
-            
-            logger.debug("Daily horoscope analysis completed successfully")
-            return horoscope_response
-        else:
-            raise ValueError(f"Expected TextBlock, got {type(text_block)}")
-    
-    except Exception as e:
-        logger.error(f"Error analyzing daily horoscope: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to analyze daily horoscope: {str(e)}")
 
 @router.post("/api/appstore-notifications")
 async def handle_appstore_notifications(request: dict):

@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
 from datetime import datetime
 from enum import Enum
+from kerykeion.kr_types import AspectModel
 
 class BirthData(BaseModel):
     """Simplified birth data with date, time, and coordinates."""
@@ -251,10 +252,10 @@ class RelationshipAnalysis(BaseModel):
     person2_chart_url: Optional[str] = None
 
 class HoroscopePeriod(Enum):
-    DAY = 'day'
-    WEEK = 'week'
-    MONTH = 'month'
-    YEAR = 'year'
+    day = 'day'
+    week = 'week'
+    month = 'month'
+    year = 'year'
 
 class HoroscopeRequest(BaseModel):
     """Request for personalized horoscope."""
@@ -296,19 +297,21 @@ class DailyTransitRequest(BaseModel):
     birth_data: BirthData
     current_location: CurrentLocation
     target_date: str
-    period: HoroscopePeriod = HoroscopePeriod.DAY
+    period: HoroscopePeriod = HoroscopePeriod.day
+
+class DailyTransit(BaseModel):
+    date: datetime
+    aspects: list[AspectModel]
+    retrograding: list[str]
 
 class DailyTransitResponse(BaseModel):
     """Daily transit data response."""
-    target_date: str
-    active_aspects: List[str]
-    retrograding_planets: List[str]
-    major_transits: List[str]
+    transits: list[DailyTransit]
 
 class DailyHoroscopeRequest(BaseModel):
     """Request for daily horoscope analysis."""
     birth_data: BirthData
-    transit_data: DailyTransitResponse
+    transit_data: DailyTransit
 
 class DailyHoroscopeResponse(BaseModel):
     """Daily horoscope analysis response."""

@@ -35,7 +35,7 @@ class AstrologyPlugin:
         description="Get transit aspects between the user's birth chart and current planetary positions for astrological timing guidance. Use this when the user asks about timing, current influences, what's happening now astrologically, or wants guidance about current planetary energies and how they interact with their natal chart.",
         name="get_transit"
     )
-    def get_transits(self, period: HoroscopePeriod = HoroscopePeriod.WEEK) -> str:
+    def get_transits(self, period: HoroscopePeriod = HoroscopePeriod.week) -> str:
         """Get transit aspects for the discussed period.
         
         Args:

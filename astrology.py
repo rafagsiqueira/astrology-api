@@ -7,11 +7,12 @@ from kerykeion import AstrologicalSubject, KerykeionChartSVG
 from kerykeion.composite_subject_factory import CompositeSubjectFactory
 from kerykeion.kr_types.kr_models import CompositeSubjectModel, TransitMomentModel
 from kerykeion.transits_time_range import TransitsTimeRangeFactory
+from kerykeion.ephemeris_data import EphemerisDataFactory
 import pytz
 from timezonefinder import TimezoneFinder
 from config import get_logger
 from models import (
-    BirthData, CurrentLocation, HoroscopePeriod, PlanetPosition, HousePosition, 
+    BirthData, CurrentLocation, DailyTransit, HoroscopePeriod, PlanetPosition, HousePosition, 
     AstrologicalChart, SignData, CompositeAnalysisRequest
 )
 
@@ -96,10 +97,11 @@ def create_astrological_subject(
         minute=date.minute,
         lat=birth_data.latitude,
         lng=birth_data.longitude,
-        tz_str=timezone
+        tz_str=timezone,
+        disable_chiron_and_lilith=True
     )
 
-def generate_transits(birth_data: BirthData, current_location: CurrentLocation, start_date: datetime, period: HoroscopePeriod) -> list[TransitMomentModel]:
+def generate_transits(birth_data: BirthData, current_location: CurrentLocation, start_date: datetime, period: HoroscopePeriod) -> list[DailyTransit]:
     """Generate AstrologicalSubjects for different time periods based on horoscope type.
     
     Args:
@@ -111,40 +113,42 @@ def generate_transits(birth_data: BirthData, current_location: CurrentLocation, 
     """
     subject = create_astrological_subject(birth_data=birth_data)
 
-    start_date_data = BirthData(
-        birth_date = f'{start_date.year}-{str(start_date.month).zfill(2)}-{str(start_date.day).zfill(2)}',
-        birth_time = '12:00',
-        latitude=current_location.latitude,
-        longitude=current_location.longitude
-    )
-
-    ephemeris_data_points = [create_astrological_subject(start_date_data)]
-
-    num_periods = 0
-    if period == HoroscopePeriod.WEEK:
-        num_periods = 6
-    if period == HoroscopePeriod.MONTH:
+    end_date = start_date + timedelta(days=1)
+    if period == HoroscopePeriod.week:
+        end_date = start_date + timedelta(days=7)
+    if period == HoroscopePeriod.month:
         #TODO: Will get periods from day 1 to last day of the month of start_date
         raise Exception("Not implemented yet")
-    if period == HoroscopePeriod.YEAR:
+    if period == HoroscopePeriod.year:
         #TODO: Will get periods from day 1 to last day of the year of start_date
         raise Exception("Not implemented yet")
 
-    for i in range(num_periods):
-        target_date = start_date + timedelta(days=i)
-        target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))  # Use noon
-
-        ephemeris_data = BirthData(
-            birth_date = f'{target_datetime.year}-{str(target_datetime.month).zfill(2)}-{str(target_datetime.day).zfill(2)}',
-            birth_time = '12:00',
+    aspects_and_retrograding_planets = []
+    
+    subjects = []
+    current_date = start_date
+    while current_date <= end_date:
+        birth_data = BirthData(
+            birth_date=f"{current_date.year}-{str(current_date.month).zfill(2)}-{str(current_date.day).zfill(2)}",
+            birth_time="12:00",
             latitude=current_location.latitude,
             longitude=current_location.longitude
         )
-        
-        ephemeris_data_points.append(create_astrological_subject(ephemeris_data))
-            
-    moments = TransitsTimeRangeFactory(subject, ephemeris_data_points).get_transit_moments().transits
-    return moments
+        subjects.append(create_astrological_subject(birth_data=birth_data))
+        current_date = current_date + timedelta(days=1)
+
+    transits = TransitsTimeRangeFactory(natal_chart=subject, ephemeris_data_points=subjects)
+    transit_moments = transits.get_transit_moments().transits
+    aspects_and_retrograding_planets: list[DailyTransit] = []
+    for idx, moment in enumerate(transit_moments):
+        retrograding_planets = []
+        planet_names = ['mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'pluto']
+        for planet_name in planet_names:
+            planet = getattr(subjects[idx], planet_name)
+            if hasattr(planet, 'retrograde') and planet.retrograde:
+                retrograding_planets.append(planet_name.capitalize())
+        aspects_and_retrograding_planets.append(DailyTransit(date=datetime.fromisoformat(moment.date), aspects=moment.aspects, retrograding=retrograding_planets))
+    return aspects_and_retrograding_planets
 
 def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_svg: bool = True) -> AstrologicalChart:
     """Convert an AstrologicalSubject to an AstrologicalChart."""
