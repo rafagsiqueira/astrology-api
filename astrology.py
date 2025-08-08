@@ -5,7 +5,8 @@ from typing import List
 from datetime import date, timedelta
 from kerykeion import AstrologicalSubject, KerykeionChartSVG
 from kerykeion.composite_subject_factory import CompositeSubjectFactory
-from kerykeion.kr_types.kr_models import CompositeSubjectModel
+from kerykeion.kr_types.kr_models import CompositeSubjectModel, TransitMomentModel
+from kerykeion.transits_time_range import TransitsTimeRangeFactory
 import pytz
 from timezonefinder import TimezoneFinder
 from config import get_logger
@@ -13,7 +14,6 @@ from models import (
     BirthData, CurrentLocation, HoroscopePeriod, PlanetPosition, HousePosition, 
     AstrologicalChart, SignData, CompositeAnalysisRequest
 )
-from cloud_storage import upload_chart_to_storage, get_chart_from_storage
 
 logger = get_logger(__name__)
 
@@ -61,7 +61,6 @@ def get_ruler(sign: str) -> str:
     }
     return rulers.get(sign, 'Unknown')
 
-
 def create_astrological_subject(
     birth_data: BirthData,
     name: str = "User",
@@ -100,95 +99,52 @@ def create_astrological_subject(
         tz_str=timezone
     )
 
-def generate_transits(current_location: CurrentLocation, period: HoroscopePeriod) -> List[AstrologicalSubject]:
+def generate_transits(birth_data: BirthData, current_location: CurrentLocation, start_date: datetime, period: HoroscopePeriod) -> list[TransitMomentModel]:
     """Generate AstrologicalSubjects for different time periods based on horoscope type.
     
     Args:
         current_location: Current location for planetary positions
-        period: Horoscope period (WEEK, MONTH, YEAR)
+        start_date: datetime value of the day to start calculating transits
         
     Returns:
-        List of AstrologicalSubjects for the specified period
+        TransitsTimeRangeModel object
     """
-    try:        
-        current_tz = get_timezone_from_coordinates(current_location.latitude, current_location.longitude)
-        tz = pytz.timezone(current_tz)
+    subject = create_astrological_subject(birth_data=birth_data)
 
-        today = date.today()
-        transits = []
+    start_date_data = BirthData(
+        birth_date = f'{start_date.year}-{str(start_date.month).zfill(2)}-{str(start_date.day).zfill(2)}',
+        birth_time = '12:00',
+        latitude=current_location.latitude,
+        longitude=current_location.longitude
+    )
 
-        if period == HoroscopePeriod.WEEK:
-            # Generate one AstrologicalSubject for each of the next 7 days
-            for i in range(7):
-                target_date = today + timedelta(days=i)
-                target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))  # Use noon
-                
-                transit_subject = AstrologicalSubject(
-                    name=f"Transit_Day_{i+1}",
-                    year=target_datetime.year,
-                    month=target_datetime.month,
-                    day=target_datetime.day,
-                    hour=target_datetime.hour,
-                    minute=target_datetime.minute,
-                    lat=current_location.latitude,
-                    lng=current_location.longitude,
-                    tz_str=current_tz
-                )
-                transits.append(transit_subject)
-                
-        elif period == HoroscopePeriod.MONTH:
-            # Generate one AstrologicalSubject every 5 days for the next month (6 subjects)
-            for i in range(0, 30, 5):
-                target_date = today + timedelta(days=i)
-                target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))  # Use noon
-                
-                transit_subject = AstrologicalSubject(
-                    name=f"Transit_Period_{i//5 + 1}",
-                    year=target_datetime.year,
-                    month=target_datetime.month,
-                    day=target_datetime.day,
-                    hour=target_datetime.hour,
-                    minute=target_datetime.minute,
-                    lat=current_location.latitude,
-                    lng=current_location.longitude,
-                    tz_str=current_tz
-                )
-                transits.append(transit_subject)
-                
-        elif period == HoroscopePeriod.YEAR:
-            # Generate one AstrologicalSubject for the 1st day of each month for the next 12 months
-            for i in range(12):
-                # Calculate the target month/year
-                target_month = today.month + i
-                target_year = today.year
-                
-                # Handle year rollover
-                while target_month > 12:
-                    target_month -= 12
-                    target_year += 1
-                
-                # Use 1st day of the month
-                target_date = date(target_year, target_month, 1)
-                target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))  # Use noon
-                
-                transit_subject = AstrologicalSubject(
-                    name=f"Transit_Month_{target_month}",
-                    year=target_datetime.year,
-                    month=target_datetime.month,
-                    day=target_datetime.day,
-                    hour=target_datetime.hour,
-                    minute=target_datetime.minute,
-                    lat=current_location.latitude,
-                    lng=current_location.longitude,
-                    tz_str=current_tz
-                )
-                transits.append(transit_subject)
+    ephemeris_data_points = [create_astrological_subject(start_date_data)]
 
-        return transits
+    num_periods = 0
+    if period == HoroscopePeriod.WEEK:
+        num_periods = 6
+    if period == HoroscopePeriod.MONTH:
+        #TODO: Will get periods from day 1 to last day of the month of start_date
+        raise Exception("Not implemented yet")
+    if period == HoroscopePeriod.YEAR:
+        #TODO: Will get periods from day 1 to last day of the year of start_date
+        raise Exception("Not implemented yet")
+
+    for i in range(num_periods):
+        target_date = start_date + timedelta(days=i)
+        target_datetime = datetime.combine(target_date, datetime.min.time().replace(hour=12))  # Use noon
+
+        ephemeris_data = BirthData(
+            birth_date = f'{target_datetime.year}-{str(target_datetime.month).zfill(2)}-{str(target_datetime.day).zfill(2)}',
+            birth_time = '12:00',
+            latitude=current_location.latitude,
+            longitude=current_location.longitude
+        )
         
-    except Exception as e:
-        logger.error(f"Failed to generate transits: {e}")
-        return []
+        ephemeris_data_points.append(create_astrological_subject(ephemeris_data))
+            
+    moments = TransitsTimeRangeFactory(subject, ephemeris_data_points).get_transit_moments().transits
+    return moments
 
 def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_svg: bool = True) -> AstrologicalChart:
     """Convert an AstrologicalSubject to an AstrologicalChart."""

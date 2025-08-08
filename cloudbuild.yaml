@@ -23,8 +23,6 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
-      - '--port'
-      - '8080'
       - '--memory'
       - '1Gi'
       - '--cpu'
@@ -37,8 +35,6 @@ steps:
       - '80'
       - '--timeout'
       - '300'
-      - '--set-env-vars'
-      - 'PORT=8080,PYTHONUNBUFFERED=1'
 
 # Store the built image
 images:

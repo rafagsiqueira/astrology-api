@@ -40,26 +40,54 @@ class TestAPIEndpoints:
         
         # Mock the business logic function to test integration
         with patch('routes.generate_birth_chart') as mock_generate:
-            mock_chart = Mock()
-            mock_chart.model_dump.return_value = {
-                'planets': {},
-                'houses': {},
-                'aspects': [],
-                'sunSign': {'name': 'Cap'},
-                'moonSign': {'name': 'Gem'},
-                'ascendant': {'name': 'Leo'},
-                'chartSvg': '<svg>test</svg>'
-            }
-            mock_generate.return_value = mock_chart
-            
-            # Test the endpoint function
-            result = asyncio.run(generate_chart_endpoint(birth_data, {'uid': 'test-user'}))
-            
-            # Verify the business logic was called with correct data
-            mock_generate.assert_called_once_with(birth_data)
-            
-            # Verify the result is returned correctly
-            assert result == mock_chart
+            with patch('routes.build_birth_chart_context') as mock_build_context:
+                with patch('routes.parse_chart_response') as mock_parse_response:
+                    with patch('routes.get_claude_client') as mock_get_claude:
+                        # Setup mocks
+                        mock_chart = Mock()
+                        mock_chart.model_dump.return_value = {
+                            'planets': {},
+                            'houses': {},
+                            'aspects': [],
+                            'sunSign': {'name': 'Cap'},
+                            'moonSign': {'name': 'Gem'},
+                            'ascendant': {'name': 'Leo'},
+                            'chartSvg': '<svg>test</svg>'
+                        }
+                        mock_generate.return_value = mock_chart
+                        mock_build_context.return_value = ("cached_context", "user_context")
+                        
+                        # Mock Claude client response with proper usage
+                        from anthropic.types import TextBlock
+                        mock_text_block = Mock(spec=TextBlock)
+                        mock_text_block.text = '"sun": {"influence": "test", "traits": []}'
+                        
+                        mock_usage = Mock()
+                        mock_usage.input_tokens = 100
+                        mock_usage.output_tokens = 50
+                        
+                        mock_response = Mock()
+                        mock_response.content = [mock_text_block]
+                        mock_response.usage = mock_usage
+                        
+                        mock_claude = Mock()
+                        mock_claude.messages.create.return_value = mock_response
+                        mock_get_claude.return_value = mock_claude
+                        
+                        # Mock parsed response
+                        from models import ChartAnalysis
+                        mock_parsed = Mock(spec=ChartAnalysis)
+                        mock_parse_response.return_value = mock_parsed
+                        
+                        # Test the endpoint function
+                        result = asyncio.run(generate_chart_endpoint(birth_data, {'uid': 'test-user'}))
+                        
+                        # Verify the business logic was called with correct data
+                        mock_generate.assert_called_once_with(birth_data)
+                        
+                        # Verify the result is the chart with analysis attached
+                        assert result == mock_chart
+                        assert mock_chart.analysis == mock_parsed
     
     def test_generate_chart_endpoint_stores_chart(self):
         """Test that generate_chart_endpoint returns the chart (note: current implementation doesn't store)"""
@@ -77,18 +105,45 @@ class TestAPIEndpoints:
         user = {'uid': 'test-user-123'}
         
         with patch('routes.generate_birth_chart') as mock_generate:
-            # Setup mocks
-            mock_chart = Mock()
-            mock_chart_data = {'planets': {}, 'houses': {}}
-            mock_chart.model_dump.return_value = mock_chart_data
-            mock_generate.return_value = mock_chart
-            
-            # Test the endpoint
-            result = asyncio.run(generate_chart_endpoint(birth_data, user))
-            
-            # Verify chart generation
-            mock_generate.assert_called_once_with(birth_data)
-            assert result == mock_chart
+            with patch('routes.build_birth_chart_context') as mock_build_context:
+                with patch('routes.parse_chart_response') as mock_parse_response:
+                    with patch('routes.get_claude_client') as mock_get_claude:
+                        # Setup mocks
+                        mock_chart = Mock()
+                        mock_chart_data = {'planets': {}, 'houses': {}}
+                        mock_chart.model_dump.return_value = mock_chart_data
+                        mock_generate.return_value = mock_chart
+                        mock_build_context.return_value = ("cached_context", "user_context")
+                        
+                        # Mock Claude client response with proper usage
+                        from anthropic.types import TextBlock
+                        mock_text_block = Mock(spec=TextBlock)
+                        mock_text_block.text = '"sun": {"influence": "test", "traits": []}'
+                        
+                        mock_usage = Mock()
+                        mock_usage.input_tokens = 100
+                        mock_usage.output_tokens = 50
+                        
+                        mock_response = Mock()
+                        mock_response.content = [mock_text_block]
+                        mock_response.usage = mock_usage
+                        
+                        mock_claude = Mock()
+                        mock_claude.messages.create.return_value = mock_response
+                        mock_get_claude.return_value = mock_claude
+                        
+                        # Mock parsed response
+                        from models import ChartAnalysis
+                        mock_parsed = Mock(spec=ChartAnalysis)
+                        mock_parse_response.return_value = mock_parsed
+                        
+                        # Test the endpoint
+                        result = asyncio.run(generate_chart_endpoint(birth_data, user))
+                        
+                        # Verify chart generation
+                        mock_generate.assert_called_once_with(birth_data)
+                        assert result == mock_chart
+                        assert mock_chart.analysis == mock_parsed
 
     def test_analyze_personality_endpoint_integration(self):
         """Test that analyze_personality_endpoint properly calls business logic"""
@@ -153,10 +208,16 @@ class TestAPIEndpoints:
   "key_development_areas": ["Self-confidence", "Communication"]
 }
 }'''
+                mock_usage = Mock()
+                mock_usage.input_tokens = 100
+                mock_usage.output_tokens = 50
+                
+                mock_response = Mock()
+                mock_response.content = [mock_text_block]
+                mock_response.usage = mock_usage
+                
                 mock_claude = Mock()
-                mock_claude.messages.create.return_value = Mock(
-                    content=[mock_text_block]
-                )
+                mock_claude.messages.create.return_value = mock_response
                 mock_get_claude.return_value = mock_claude
                 
                 # Test the endpoint function
@@ -192,10 +253,16 @@ class TestAPIEndpoints:
                     from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
                     mock_text_block.text = '"overview": "Test analysis overview"'
+                    mock_usage = Mock()
+                    mock_usage.input_tokens = 100
+                    mock_usage.output_tokens = 50
+                    
+                    mock_response = Mock()
+                    mock_response.content = [mock_text_block]
+                    mock_response.usage = mock_usage
+                    
                     mock_claude = Mock()
-                    mock_claude.messages.create.return_value = Mock(
-                        content=[mock_text_block]
-                    )
+                    mock_claude.messages.create.return_value = mock_response
                     mock_get_claude.return_value = mock_claude
                     
                     # Mock parsed response
@@ -269,8 +336,8 @@ class TestAPIEndpoints:
             longitude=-118.2437
         )
         request = RelationshipAnalysisRequest(
-            person1_birth_data=person1_birth_data,
-            person2_birth_data=person2_birth_data,
+            person1=person1_birth_data,
+            person2=person2_birth_data,
             relationship_type="romantic"
         )
         auth_user = {'uid': 'test-user-123'}
@@ -279,41 +346,55 @@ class TestAPIEndpoints:
         with patch('routes.build_relationship_context') as mock_build_context:
             with patch('routes.get_claude_client') as mock_get_claude:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
-                    # Setup mocks
-                    mock_build_context.return_value = "Mocked relationship analysis context"
-                    
-                    # Mock Claude client and response
-                    from anthropic.types import TextBlock
-                    mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = "Mocked Claude response"
-                    mock_claude_response = Mock()
-                    mock_claude_response.content = [mock_text_block]
-                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
-                    
-                    # Mock parsed response
-                    mock_parse_response.return_value = RelationshipAnalysis(
-                        score=85,
-                        overview="This is a powerful astrological connection with strong karmic ties.",
-                        compatibility_level="Very High",
-                        destiny_signs="Strong karmic connections present",
-                        relationship_aspects=["Sun conjunction Moon", "Venus trine Mars"],
-                        strengths=["Deep emotional understanding", "Natural compatibility"],
-                        challenges=["Intensity may be overwhelming", "Need to maintain independence"],
-                        areas_for_growth=["Embrace the connection while maintaining individual growth"]
-                    )
-                    
-                    # Test the method
-                    result = asyncio.run(analyze_relationship(request, auth_user))
-                    
-                    # Verify the result
-                    assert result.score == 85
-                    assert result.overview == "This is a powerful astrological connection with strong karmic ties."
-                    assert result.compatibility_level == "Very High"
-                    assert result.destiny_signs == "Strong karmic connections present"
-                    assert result.relationship_aspects == ["Sun conjunction Moon", "Venus trine Mars"]
-                    assert result.strengths == ["Deep emotional understanding", "Natural compatibility"]
-                    assert result.challenges == ["Intensity may be overwhelming", "Need to maintain independence"]
-                    assert result.areas_for_growth == ["Embrace the connection while maintaining individual growth"]
+                    with patch('routes.create_astrological_subject') as mock_create_subject:
+                        with patch('routes.RelationshipScoreFactory') as mock_score_factory:
+                            with patch('routes.generate_birth_chart') as mock_generate_chart:
+                                # Setup mocks
+                                mock_build_context.return_value = "Mocked relationship analysis context"
+                                mock_create_subject.return_value = Mock()
+                                mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=85, score_description="High", is_destiny_sign=True, aspects=[])
+                                mock_chart = Mock()
+                                mock_chart.chartImageUrl = "https://test.com/chart.svg"
+                                mock_generate_chart.return_value = mock_chart
+                                
+                                # Mock Claude client and response
+                                from anthropic.types import TextBlock
+                                mock_text_block = Mock(spec=TextBlock)
+                                mock_text_block.text = "Mocked Claude response"
+                                
+                                mock_usage = Mock()
+                                mock_usage.input_tokens = 100
+                                mock_usage.output_tokens = 50
+                                
+                                mock_claude_response = Mock()
+                                mock_claude_response.content = [mock_text_block]
+                                mock_claude_response.usage = mock_usage
+                                mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                                
+                                # Mock parsed response
+                                mock_parse_response.return_value = RelationshipAnalysis(
+                                    score=85,
+                                    overview="This is a powerful astrological connection with strong karmic ties.",
+                                    compatibility_level="Very High",
+                                    destiny_signs="Strong karmic connections present",
+                                    relationship_aspects=["Sun conjunction Moon", "Venus trine Mars"],
+                                    strengths=["Deep emotional understanding", "Natural compatibility"],
+                                    challenges=["Intensity may be overwhelming", "Need to maintain independence"],
+                                    areas_for_growth=["Embrace the connection while maintaining individual growth"]
+                                )
+                                
+                                # Test the method
+                                result = asyncio.run(analyze_relationship(request, auth_user))
+                                
+                                # Verify the result
+                                assert result.score == 85
+                                assert result.overview == "This is a powerful astrological connection with strong karmic ties."
+                                assert result.compatibility_level == "Very High"
+                                assert result.destiny_signs == "Strong karmic connections present"
+                                assert result.relationship_aspects == ["Sun conjunction Moon", "Venus trine Mars"]
+                                assert result.strengths == ["Deep emotional understanding", "Natural compatibility"]
+                                assert result.challenges == ["Intensity may be overwhelming", "Need to maintain independence"]
+                                assert result.areas_for_growth == ["Embrace the connection while maintaining individual growth"]
 
     def test_analyze_relationship_structured_analysis_error(self):
         """Test relationship analysis when structured analysis fails"""
@@ -336,8 +417,8 @@ class TestAPIEndpoints:
             longitude=-118.2437
         )
         request = RelationshipAnalysisRequest(
-            person1_birth_data=person1_birth_data,
-            person2_birth_data=person2_birth_data,
+            person1=person1_birth_data,
+            person2=person2_birth_data,
             relationship_type="romantic"
         )
         auth_user = {'uid': 'test-user-123'}
@@ -378,8 +459,8 @@ class TestAPIEndpoints:
             longitude=-118.2437
         )
         request = RelationshipAnalysisRequest(
-            person1_birth_data=person1_birth_data,
-            person2_birth_data=person2_birth_data,
+            person1=person1_birth_data,
+            person2=person2_birth_data,
             relationship_type="romantic"
         )
         auth_user = {'uid': 'test-user-123'}
@@ -429,8 +510,8 @@ class TestAPIEndpoints:
             longitude=-118.2437
         )
         request = RelationshipAnalysisRequest(
-            person1_birth_data=person1_birth_data,
-            person2_birth_data=person2_birth_data,
+            person1=person1_birth_data,
+            person2=person2_birth_data,
             relationship_type="romantic"
         )
         auth_user = {'uid': 'test-user-123'}
@@ -462,8 +543,8 @@ class TestAPIEndpoints:
             longitude=-0.1278
         )
         request = RelationshipAnalysisRequest(
-            person1_birth_data=person1_birth_data,
-            person2_birth_data=person2_birth_data,
+            person1=person1_birth_data,
+            person2=person2_birth_data,
             relationship_type="romantic"
         )
         auth_user = {'uid': 'test-user-123'}
@@ -472,39 +553,53 @@ class TestAPIEndpoints:
         with patch('routes.build_relationship_context') as mock_build_context:
             with patch('routes.get_claude_client') as mock_get_claude:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
-                    # Setup mocks for low compatibility
-                    mock_build_context.return_value = "Mocked relationship context"
-                    
-                    # Mock Claude client and response
-                    from anthropic.types import TextBlock
-                    mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = "Mocked Claude response for low score"
-                    mock_claude_response = Mock()
-                    mock_claude_response.content = [mock_text_block]
-                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
-                    
-                    # Mock parsed response for low compatibility
-                    mock_parse_response.return_value = RelationshipAnalysis(
-                        score=35,
-                        overview="This relationship may require significant effort to develop compatibility.",
-                        compatibility_level="Low",
-                        destiny_signs="No significant karmic connections",
-                        relationship_aspects=["Limited harmonious aspects"],
-                        strengths=["Opportunity for growth", "Learning from differences"],
-                        challenges=["Different life approaches", "Communication barriers"],
-                        areas_for_growth=["Focus on building understanding through patient communication"]
-                    )
-                    
-                    # Test the method
-                    result = asyncio.run(analyze_relationship(request, auth_user))
-                    
-                    # Verify the result
-                    assert result.score == 35
-                    assert result.overview == "This relationship may require significant effort to develop compatibility."
-                    assert result.compatibility_level == "Low"
-                    assert result.destiny_signs == "No significant karmic connections"
-                    assert result.relationship_aspects == ["Limited harmonious aspects"]
-                    assert "significant effort" in result.overview
-                    assert result.strengths == ["Opportunity for growth", "Learning from differences"]
-                    assert result.challenges == ["Different life approaches", "Communication barriers"]
-                    assert result.areas_for_growth == ["Focus on building understanding through patient communication"]
+                    with patch('routes.create_astrological_subject') as mock_create_subject:
+                        with patch('routes.RelationshipScoreFactory') as mock_score_factory:
+                            with patch('routes.generate_birth_chart') as mock_generate_chart:
+                                # Setup mocks for low compatibility
+                                mock_build_context.return_value = "Mocked relationship context"
+                                mock_create_subject.return_value = Mock()
+                                mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=35, score_description="Low", is_destiny_sign=False, aspects=[])
+                                mock_chart = Mock()
+                                mock_chart.chartImageUrl = "https://test.com/chart.svg"
+                                mock_generate_chart.return_value = mock_chart
+                                
+                                # Mock Claude client and response
+                                from anthropic.types import TextBlock
+                                mock_text_block = Mock(spec=TextBlock)
+                                mock_text_block.text = "Mocked Claude response for low score"
+                                
+                                mock_usage = Mock()
+                                mock_usage.input_tokens = 100
+                                mock_usage.output_tokens = 50
+                                
+                                mock_claude_response = Mock()
+                                mock_claude_response.content = [mock_text_block]
+                                mock_claude_response.usage = mock_usage
+                                mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                                
+                                # Mock parsed response for low compatibility
+                                mock_parse_response.return_value = RelationshipAnalysis(
+                                    score=35,
+                                    overview="This relationship may require significant effort to develop compatibility.",
+                                    compatibility_level="Low",
+                                    destiny_signs="No significant karmic connections",
+                                    relationship_aspects=["Limited harmonious aspects"],
+                                    strengths=["Opportunity for growth", "Learning from differences"],
+                                    challenges=["Different life approaches", "Communication barriers"],
+                                    areas_for_growth=["Focus on building understanding through patient communication"]
+                                )
+                                
+                                # Test the method
+                                result = asyncio.run(analyze_relationship(request, auth_user))
+                                
+                                # Verify the result
+                                assert result.score == 35
+                                assert result.overview == "This relationship may require significant effort to develop compatibility."
+                                assert result.compatibility_level == "Low"
+                                assert result.destiny_signs == "No significant karmic connections"
+                                assert result.relationship_aspects == ["Limited harmonious aspects"]
+                                assert "significant effort" in result.overview
+                                assert result.strengths == ["Opportunity for growth", "Learning from differences"]
+                                assert result.challenges == ["Different life approaches", "Communication barriers"]
+                                assert result.areas_for_growth == ["Focus on building understanding through patient communication"]

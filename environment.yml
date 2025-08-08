@@ -152,6 +152,7 @@ dependencies:
       - six==1.17.0
       - solarsystem==0.1.5
       - starlette==0.27.0
+      - tiktoken==0.10.0
       - timezonefinder==6.2.0
       - tqdm==4.67.1
       - typing-inspection==0.4.1

@@ -13,7 +13,7 @@ from semantic_kernel.contents import ChatHistory, ChatMessageContent, AuthorRole
 from semantic_kernel.contents import ChatHistorySummarizationReducer
 from semantic_kernel.functions import kernel_function
 
-from models import CurrentLocation, BirthData
+from models import CurrentLocation, BirthData, HoroscopePeriod
 from astrology import generate_transits
 from config import get_logger, ANTHROPIC_API_KEY
 
@@ -35,31 +35,18 @@ class AstrologyPlugin:
         description="Get transit aspects between the user's birth chart and current planetary positions for astrological timing guidance. Use this when the user asks about timing, current influences, what's happening now astrologically, or wants guidance about current planetary energies and how they interact with their natal chart.",
         name="get_transit"
     )
-    def get_transit(self) -> str:
-        """Get transit aspects between user's birth chart and current planetary positions.
+    def get_transits(self, period: HoroscopePeriod = HoroscopePeriod.WEEK) -> str:
+        """Get transit aspects for the discussed period.
         
+        Args:
+            period: The HoroscopePeriod relevant for the conversation.
+
         Returns:
             Synastry aspects as a formatted string
         """
-        try:
-            # Use the new generate_synastry function from astrology.py
-            # aspects = generate_transits(self.user_birth_data, self.current_location)
-            
-            # # Format only the aspects
-            # if aspects:
-            #     synastry_info = "Current Transit Aspects:\n\n"
-            #     for aspect in aspects:
-            #         synastry_info += f"• {aspect['p1_name']} (natal) {aspect['aspect']} {aspect['p2_name']} (transit) - Orb: {aspect['orbit']:.1f}°\n"
-            # else:
-            #     synastry_info = "No significant transit aspects found at this time."
-            
-            # logger.debug("Synastry information requested and provided")
-            return ""
-            
-        except Exception as e:
-            logger.error(f"Error getting synastry aspects: {e}")
-            return "Unable to retrieve current transit aspects to your birth chart at this time."
-
+        
+        # (model, ) = generate_transits(self.user_birth_data, self.current_location, period=period)
+        return ""
 
 def get_semantic_kernel(birth_data: Optional[BirthData] = None, current_location: Optional[CurrentLocation] = None) -> Kernel:
     """Get or create the semantic kernel instance with optional astrology plugin.
@@ -232,7 +219,7 @@ async def save_chat_history_to_firebase(user_id: str, chat_history: ChatHistoryS
     try:
         # Serialize the chat history to a dict (exclude service as it can't be serialized)
         serialized_data = {
-            'chat_history_state': chat_history.model_dump(exclude={'service'}),
+            'chat_history_state': chat_history.serialize(),
             'updated_at': datetime.now(),
             'message_count': len(chat_history.messages)
         }

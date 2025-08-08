@@ -177,9 +177,14 @@ class CurrentPlanetaryData(BaseModel):
     planets: List[CurrentPlanetPosition]
     transits: List[TransitAspect]
 
+class ChatRole(Enum):
+    ASSISTANT = 'assistant'
+    USER = 'user'
+    SYSTEM = 'system'
+
 class ChatMessage(BaseModel):
     """Chat message for astrological consultation."""
-    role: str  # "user" or "assistant" - controlled by backend only
+    role: ChatRole
     content: str
     timestamp: datetime
 
@@ -246,6 +251,7 @@ class RelationshipAnalysis(BaseModel):
     person2_chart_url: Optional[str] = None
 
 class HoroscopePeriod(Enum):
+    DAY = 'day'
     WEEK = 'week'
     MONTH = 'month'
     YEAR = 'year'
@@ -256,13 +262,17 @@ class HoroscopeRequest(BaseModel):
     current_location: CurrentLocation
     horoscope_type: HoroscopePeriod
 
+class HoroscopeFindings(BaseModel):
+    date: str
+    horoscope: str
+    active_aspects: list[str]
+    retrograding_planets: list[str]
+
 class HoroscopeResponse(BaseModel):
     """Personalized horoscope response."""
-    date: str
-    content: str
-    key_influences: List[str]
-    lucky_numbers: Optional[List[int]] = None
-    lucky_colors: Optional[List[str]] = None
+    overall_summary: str
+    specific_findings: list[HoroscopeFindings]
+    chart_urls: list[str]
 
 class CompositeAnalysisRequest(BaseModel):
     """Request for composite chart analysis between two people."""
@@ -280,3 +290,30 @@ class CompositeAnalysis(BaseModel):
     strengths_and_challenges: Dict[str, List[str]]
     long_term_potential: Dict[str, List[str]]
     chart_svg_url: Optional[str] = None
+
+class DailyTransitRequest(BaseModel):
+    """Request for daily transit data."""
+    birth_data: BirthData
+    current_location: CurrentLocation
+    target_date: str
+    period: HoroscopePeriod = HoroscopePeriod.DAY
+
+class DailyTransitResponse(BaseModel):
+    """Daily transit data response."""
+    target_date: str
+    active_aspects: List[str]
+    retrograding_planets: List[str]
+    major_transits: List[str]
+
+class DailyHoroscopeRequest(BaseModel):
+    """Request for daily horoscope analysis."""
+    birth_data: BirthData
+    transit_data: DailyTransitResponse
+
+class DailyHoroscopeResponse(BaseModel):
+    """Daily horoscope analysis response."""
+    target_date: str
+    horoscope_text: str
+    key_themes: List[str]
+    energy_level: str  # low, moderate, high, intense
+    focus_areas: List[str]

@@ -77,58 +77,59 @@ class TestBuildBirthChartContext:
     
     def test_build_birth_chart_context_returns_string(self):
         """Test that build_birth_chart_context returns a string."""
-        context = build_birth_chart_context(self.chart)
+        (cached, user) = build_birth_chart_context(self.chart)
         
-        assert isinstance(context, str)
-        assert len(context) > 0
+        assert isinstance(user, str)
+        assert len(user) > 0
     
     def test_context_contains_required_elements(self):
         """Test that the context contains required astrological elements."""
-        context = build_birth_chart_context(self.chart)
+        (cached, user) = build_birth_chart_context(self.chart)
         
         # Check for key instructional elements
-        assert "expert astrologer" in context
-        assert "planet-house combinations" in context
-        assert "JSON structure" in context
+        assert "expert astrologer" in cached
+        assert "planet-house combinations" in user
+        assert "JSON structure" in cached
         
-        # Check for planet placeholders
-        assert "sun" in context.lower()
-        assert "moon" in context.lower()
-        assert "mercury" in context.lower()
-        assert "venus" in context.lower()
-        assert "mars" in context.lower()
-        assert "jupiter" in context.lower()
-        assert "saturn" in context.lower()
-        assert "uranus" in context.lower()
-        assert "neptune" in context.lower()
-        assert "pluto" in context.lower()
+        # Check for planet placeholders (only the ones in our test fixture)
+        assert "sun" in user.lower()
+        assert "moon" in user.lower()
+        assert "mercury" in user.lower()
         
-        # Check for sign elements
-        assert "sun_sign" in context
-        assert "moon_sign" in context
-        assert "ascendant" in context
+        # These should be in the cached JSON template, not user context
+        assert "venus" in cached.lower()
+        assert "mars" in cached.lower()
+        assert "jupiter" in cached.lower()
+        assert "saturn" in cached.lower()
+        assert "uranus" in cached.lower()
+        assert "neptune" in cached.lower()
+        assert "pluto" in cached.lower()
+        
+        # Check for sign elements in the cached template
+        assert "sun_sign" in cached.lower()
+        assert "moon_sign" in cached.lower()
+        assert "ascendant" in cached.lower()
     
     def test_context_includes_planet_data(self):
         """Test that the context includes the planet positions."""
-        context = build_birth_chart_context(self.chart)
+        (cached, user) = build_birth_chart_context(self.chart)
         
         # The planets should be formatted into the context
         # Since format uses self.chart.planets, we should see evidence of the planets dict
-        assert "{$PLANET_HOUSES}" not in context  # Should be replaced
+        assert "{PLANET_HOUSES}" not in user  # Should be replaced
         
         # The actual planet data should be included somehow
         # Note: The actual format depends on how the planets dict is converted to string
         
     def test_context_format_structure(self):
         """Test that the context has the expected JSON format structure."""
-        context = build_birth_chart_context(self.chart)
+        (cached, user) = build_birth_chart_context(self.chart)
         
         # Check for proper JSON structure elements
-        assert '"meaning": string' in context
-        assert '"influence": string' in context
-        assert '"traits": list' in context
+        assert '"influence": string' in cached
+        assert '"traits": list' in cached
         
-        # Check that all required planet/sign fields are present
+        # Check that all required planet/sign fields are present in the cached template
         expected_fields = [
             '"sun":', '"moon":', '"mercury":', '"venus":', '"mars":',
             '"jupiter":', '"saturn":', '"uranus":', '"neptune":', '"pluto":',
@@ -136,7 +137,7 @@ class TestBuildBirthChartContext:
         ]
         
         for field in expected_fields:
-            assert field in context
+            assert field in cached.lower()
     
     def test_empty_planets_dict(self):
         """Test handling of empty planets dictionary."""
@@ -149,12 +150,12 @@ class TestBuildBirthChartContext:
             chartSvg="<svg>mock chart</svg>"
         )
         
-        context = build_birth_chart_context(empty_chart)
+        (cached, user) = build_birth_chart_context(empty_chart)
         
         # Should still return a valid context string
-        assert isinstance(context, str)
-        assert len(context) > 0
-        assert "expert astrologer" in context
+        assert isinstance(user, str)
+        assert len(user) > 0
+        assert "expert astrologer" in cached
 
 
 class TestParseChartResponse:
@@ -165,67 +166,54 @@ class TestParseChartResponse:
         # Note: The function expects response without opening brace
         valid_response = '''
     "sun": {
-        "meaning": "Core identity and life force",
         "influence": "Strong leadership qualities",
         "traits": ["confident", "creative", "generous"]
     },
     "moon": {
-        "meaning": "Emotional nature and instincts",
         "influence": "Deep emotional sensitivity",
         "traits": ["nurturing", "intuitive", "protective"]
     },
     "mercury": {
-        "meaning": "Communication and thinking",
         "influence": "Analytical and detail-oriented",
         "traits": ["practical", "precise", "methodical"]
     },
     "venus": {
-        "meaning": "Love and relationships",
         "influence": "Harmonious approach to partnerships",
         "traits": ["diplomatic", "artistic", "charming"]
     },
     "mars": {
-        "meaning": "Action and energy",
         "influence": "Determined and ambitious",
         "traits": ["assertive", "energetic", "competitive"]
     },
     "jupiter": {
-        "meaning": "Growth and expansion",
         "influence": "Optimistic outlook on life",
         "traits": ["generous", "philosophical", "adventurous"]
     },
     "saturn": {
-        "meaning": "Structure and discipline",
         "influence": "Strong sense of responsibility",
         "traits": ["disciplined", "patient", "reliable"]
     },
     "uranus": {
-        "meaning": "Innovation and change",
         "influence": "Unconventional thinking",
         "traits": ["independent", "progressive", "inventive"]
     },
     "neptune": {
-        "meaning": "Dreams and spirituality",
         "influence": "Heightened intuition",
         "traits": ["compassionate", "imaginative", "mystical"]
     },
     "pluto": {
-        "meaning": "Transformation and power",
         "influence": "Deep psychological insight",
         "traits": ["intense", "transformative", "powerful"]
     },
     "sun_sign": {
-        "meaning": "Leo energy and fire element",
         "influence": "Natural leadership abilities",
         "traits": ["charismatic", "dramatic", "loyal"]
     },
     "moon_sign": {
-        "meaning": "Cancer emotional nature",
         "influence": "Strong family connections",
         "traits": ["caring", "protective", "emotional"]
     },
     "ascendant": {
-        "meaning": "Leo rising appearance",
         "influence": "Confident outward expression",
         "traits": ["magnetic", "warm", "expressive"]
     }
@@ -238,11 +226,9 @@ class TestParseChartResponse:
         assert isinstance(result, ChartAnalysis)
         
         # Check some specific fields
-        assert result.sun.meaning == "Core identity and life force"
         assert result.sun.influence == "Strong leadership qualities"
         assert result.sun.traits == ["confident", "creative", "generous"]
         
-        assert result.moon.meaning == "Emotional nature and instincts"
         assert len(result.mercury.traits) == 3
     
     def test_parse_invalid_json(self):
