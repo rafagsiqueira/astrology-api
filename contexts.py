@@ -1,8 +1,8 @@
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
-from astrology import create_astrological_subject, generate_birth_chart, generate_composite_chart
-from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, ChatMessage, CurrentLocation, HoroscopePeriod, HoroscopeRequest, PersonalityAnalysis, RelationshipAnalysis, RelationshipAnalysis, RelationshipAnalysisRequest, CompositeAnalysisRequest, CompositeAnalysis, DailyTransitResponse, DailyHoroscopeResponse
+from astrology import create_astrological_subject, generate_birth_chart, generate_composite_chart, subject_to_chart
+from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, ChatMessage, CurrentLocation, DailyTransit, HoroscopePeriod, HoroscopeRequest, PersonalityAnalysis, RelationshipAnalysis, RelationshipAnalysis, RelationshipAnalysisRequest, CompositeAnalysisRequest, CompositeAnalysis, DailyTransitResponse, DailyHoroscopeResponse
 from config import get_claude_client, get_logger
 from kerykeion import SynastryAspects
 from kerykeion.kr_types.kr_models import RelationshipScoreModel, TransitsTimeRangeModel   
@@ -19,7 +19,6 @@ def build_birth_chart_context(
 	positions of celestial bodies in different houses. You will receive a list of planets (including the
 	Sun and Moon) and their corresponding houses. Your job is to explain what it means for each
 	celestial body to be in its particular house and how it affects someone's personality.
-	Always answer in JSON format.
 
 	For each planet-house combination in the list:
 
@@ -38,10 +37,10 @@ def build_birth_chart_context(
 	</traits>
 	</interpretation>
 
-	Also explain the influence of the sun sign, moon sign and ascendant:
+	Very importantly, also explain the influence of the ascendant:
 	<interpretation>
-	<sign>Either sun, moon or ascendant</sign>
-	<influence>[Description of influence on personality]</influence>
+	<sign>Ascendant</sign>
+	<influence>[Description of influence of ascendant on personality]</influence>
 	<traits>
 	- [Trait 1]
 	- [Trait 2]
@@ -60,16 +59,9 @@ def build_birth_chart_context(
 	an expert astrologer.
 
 	<formatting>
-	Output your analysis in pure JSON structure:
+	Keep your answer to a maximum of 2048 tokens.
+	Always answer in JSON format using the following structure:
 	{{
-		"sun": {{
-			"influence": string,
-			"traits": list 
-		}},
-		"moon": {{
-			"influence": string,
-			"traits": list 
-		}},
 		"mercury": {{
 			"influence": string,
 			"traits": list 
@@ -102,19 +94,20 @@ def build_birth_chart_context(
 			"influence": string,
 			"traits": list 
 		}},
-		"sun_sign": {{
+		"sun": {{
 			"influence": string,
 			"traits": list 
 		}},
-		"moon_sign": {{
+		"moon": {{
 			"influence": string,
 			"traits": list 
 		}},
 		"ascendant": {{
 			"influence": string,
 			"traits": list 
-		}},
+		}}
 	}}
+	</formatting>
 	"""
 	user = """
 	Here is the list of planet-house combinations:
@@ -123,9 +116,17 @@ def build_birth_chart_context(
 	{PLANET_HOUSES}
 	</planet_houses>
 
+	Here is the ascendant sign information:
+	<ascendant>
+	{ASCENDANT}
+	</ascendant>
+
 	Please provide your analysis.
 	"""
-	return (system, user.format(PLANET_HOUSES=str(subject.planets)))
+	return (system, user.format(
+		PLANET_HOUSES=str(subject.planets),
+		ASCENDANT=str(subject.ascendant)
+	))
 
 def parse_chart_response(response: str) -> ChartAnalysis:
 	"""Parse the structured analysis response from Claude.
@@ -161,7 +162,7 @@ def build_personality_context(
 		longitude=request.longitude
 	)
 		 
-	chart = generate_birth_chart(birth_data)
+	chart = generate_birth_chart(birth_data, with_svg=False)
 		 
 	system = """
 	Your task is to analyze a birth chart and provide insights into the individual's personality, strengths, challenges, and life path. You
@@ -233,7 +234,8 @@ def build_personality_context(
 	tendencies and potentials.
 
 	<formatting>
-	Output your analysis in pure JSON structure:
+	Keep your answer to a maximum of 2048 tokens.
+	Always answer in JSON format using the following structure:
 	{{
 		"overview": string,
 		"personality_traits": {{
@@ -350,7 +352,7 @@ def build_horoscope_context(
 	list of astrological aspects and a list of retrograding planets. Your goal is to interpret these aspects and provide insightful,
 	engaging, and personalized astrological guidance.
 
-	Your response should be in JSON format, containing an overall summary of the horoscope and specific
+	Your response should contain overall summary of the horoscope and specific
 	findings for each date period mentioned in the aspects list.
 
 	To create the horoscope:
@@ -386,8 +388,8 @@ def build_horoscope_context(
 	a "horoscope" for that date, a list of the "active_aspects" on that date and a list of "retrograding_planets" on that date.
 
 	<formatting>
-	Begin your analysis and horoscope creation now, and provide your response in the requested JSON
-	format. Output your analysis in pure JSON structure:
+	Keep your answer to a maximum of 2048 tokens.
+	Always answer in JSON format using the following structure:
 	{{
 		"overvall_summary": string,
 		"specific_findings": [
@@ -507,7 +509,8 @@ def build_relationship_context(
 	</analysis>
 
 	<formatting>
-	Output your analysis in pure JSON structure:
+	Keep your answer to a maximum of 2048 tokens.
+	Always answer in JSON format using the following structure:
 	{{
 		"score": int,
 		"overview": string,
@@ -765,7 +768,7 @@ def parse_composite_response(response: str) -> CompositeAnalysis:
 
 def build_daily_horoscope_context(
 	birth_data: BirthData,
-	transit_data: DailyTransitResponse
+	transit_data: DailyTransit
 ) -> tuple[str, str]:
 	"""Build context for daily horoscope analysis based on transit data.
 	
@@ -831,8 +834,5 @@ def build_daily_horoscope_context(
 		BIRTH_TIME=birth_data.birth_time,
 		LATITUDE=birth_data.latitude,
 		LONGITUDE=birth_data.longitude,
-		TARGET_DATE=transit_data.target_date,
-		ACTIVE_ASPECTS=", ".join(transit_data.active_aspects),
-		RETROGRADE_PLANETS=", ".join(transit_data.retrograding_planets),
-		MAJOR_TRANSITS=", ".join(transit_data.major_transits)
+		TARGET_DATE=transit_data.date,
 	))

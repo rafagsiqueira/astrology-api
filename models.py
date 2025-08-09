@@ -56,6 +56,7 @@ class ChartAnalysis(BaseModel):
     """Comprehensive chart analysis with detailed planetary interpretations."""
     sun: PlanetAnalysis
     moon: PlanetAnalysis
+    ascendant: PlanetAnalysis
     mercury: PlanetAnalysis
     venus: PlanetAnalysis
     mars: PlanetAnalysis
@@ -64,9 +65,6 @@ class ChartAnalysis(BaseModel):
     uranus: PlanetAnalysis
     neptune: PlanetAnalysis
     pluto: PlanetAnalysis
-    sun_sign: PlanetAnalysis
-    moon_sign: PlanetAnalysis
-    ascendant: PlanetAnalysis
 
 class AstrologicalChart(BaseModel):
     """Complete astrological chart data."""

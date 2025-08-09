@@ -32,6 +32,25 @@ logger = get_logger(__name__)
 # Create router
 router = APIRouter()
 
+def assert_stop_reason_end_turn(response):
+    """Assert that the Claude API response has stop_reason 'end_turn'.
+    
+    Raises:
+        HTTPException: If stop_reason is not 'end_turn'
+    """
+    if hasattr(response, 'stop_reason') and response.stop_reason != 'end_turn':
+        logger.error(f"Claude API response had unexpected stop_reason: {response.stop_reason}")
+        raise HTTPException(
+            status_code=502, 
+            detail=f"AI response incomplete (stop_reason: {response.stop_reason}). Please try again."
+        )
+    elif not hasattr(response, 'stop_reason'):
+        logger.warning("Claude API response missing stop_reason attribute")
+
+def assert_end_turn(response):
+    """Alias for assert_stop_reason_end_turn for backward compatibility."""
+    assert_stop_reason_end_turn(response)
+
 async def call_claude_with_analytics(claude_client, endpoint_name: str, user_id: str, **claude_kwargs):
     """Wrapper for Claude API calls that tracks 429 errors and token usage to Google Analytics.
     
@@ -109,7 +128,7 @@ async def generate_chart_endpoint(
             endpoint_name="generate-chart",
             user_id=user['uid'],
             model="claude-3-5-haiku-latest",
-            max_tokens=1000,
+            max_tokens=2048,
             system=[
                 {
                     "type": "text",
@@ -122,13 +141,15 @@ async def generate_chart_endpoint(
                 {"role": "assistant", "content": "{"}
             ]
         )
+
+        assert_end_turn(response)
         
         # Parse response - cast to TextBlock to access text attribute
         from anthropic.types import TextBlock
         text_block = response.content[0]
         if isinstance(text_block, TextBlock):
             analysis = parse_chart_response(text_block.text)
-            logger.debug("Personality analysis completed successfully")
+            logger.debug("Chart generation completed successfully")
             chart.analysis = analysis
             return chart
         else:
@@ -159,7 +180,7 @@ async def analyze_personality(
             endpoint_name="analyze-personality",
             user_id=user['uid'],
             model="claude-3-5-haiku-latest",
-            max_tokens=1000,
+            max_tokens=2048,
             system=[
                 {
                     "type": "text",
@@ -172,6 +193,8 @@ async def analyze_personality(
                 {"role": "assistant", "content": "{"}
             ]
         )
+
+        assert_end_turn(response)
         
         # Parse response - cast to TextBlock to access text attribute
         from anthropic.types import TextBlock
@@ -223,7 +246,7 @@ async def analyze_relationship(
             endpoint_name="analyze-relationship", 
             user_id=user['uid'],
             model="claude-3-5-haiku-latest",
-            max_tokens=1000,
+            max_tokens=2048,
             system=[
                 {
                     "type": "text",
@@ -236,6 +259,9 @@ async def analyze_relationship(
                 {"role": "assistant", "content": "{"}
             ]
         )
+
+        assert_end_turn(response)
+
         # Parse response - cast to TextBlock to access text attribute
         from anthropic.types import TextBlock
         text_block = response.content[0]
@@ -280,7 +306,7 @@ async def analyze_composite(
             endpoint_name="analyze-composite", 
             user_id=user['uid'],
             model="claude-3-5-haiku-latest",
-            max_tokens=1000,
+            max_tokens=2048,
             system=[
                 {
                     "type": "text",
@@ -293,6 +319,8 @@ async def analyze_composite(
                 {"role": "assistant", "content": "{"}
             ]
         )
+
+        assert_end_turn(response)
         
         # Parse response - cast to TextBlock to access text attribute
         from anthropic.types import TextBlock
@@ -372,7 +400,7 @@ async def chat_with_astrologer(
             full_response = ""
             try:
                 with claude_client.messages.stream(
-                    max_tokens=1024,
+                    max_tokens=2048,
                     system=[
                         {
                             "type": "text",

@@ -97,8 +97,7 @@ def create_astrological_subject(
         minute=date.minute,
         lat=birth_data.latitude,
         lng=birth_data.longitude,
-        tz_str=timezone,
-        disable_chiron_and_lilith=True
+        tz_str=timezone
     )
 
 def generate_transits(birth_data: BirthData, current_location: CurrentLocation, start_date: datetime, period: HoroscopePeriod) -> list[DailyTransit]:
@@ -125,19 +124,10 @@ def generate_transits(birth_data: BirthData, current_location: CurrentLocation, 
 
     aspects_and_retrograding_planets = []
     
-    subjects = []
-    current_date = start_date
-    while current_date <= end_date:
-        birth_data = BirthData(
-            birth_date=f"{current_date.year}-{str(current_date.month).zfill(2)}-{str(current_date.day).zfill(2)}",
-            birth_time="12:00",
-            latitude=current_location.latitude,
-            longitude=current_location.longitude
-        )
-        subjects.append(create_astrological_subject(birth_data=birth_data))
-        current_date = current_date + timedelta(days=1)
+    ephemeris_factory = EphemerisDataFactory(start_datetime=start_date, end_datetime=end_date, lat=current_location.latitude, lng=current_location.longitude)
+    subjects = ephemeris_factory.get_ephemeris_data_as_astrological_subjects()
 
-    transits = TransitsTimeRangeFactory(natal_chart=subject, ephemeris_data_points=subjects)
+    transits = TransitsTimeRangeFactory(natal_chart=subject, ephemeris_data_points=ephemeris_factory.get_ephemeris_data_as_astrological_subjects())
     transit_moments = transits.get_transit_moments().transits
     aspects_and_retrograding_planets: list[DailyTransit] = []
     for idx, moment in enumerate(transit_moments):
