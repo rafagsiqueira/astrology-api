@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 from astrology import (
     get_element, get_modality, get_ruler, 
-    create_cosmiclogical_subject, generate_birth_chart,
+    create_astrological_subject, generate_birth_chart,
     generate_transits, diff_transits
 )
 from models import BirthData, CurrentLocation, HoroscopePeriod, DailyTransit
@@ -21,7 +21,7 @@ class MockAspect:
         self.aspect = aspect
 
 
-class TestCosmiclogyHelpers(unittest.TestCase):
+class TestAstrologyHelpers(unittest.TestCase):
     """Test helper functions for astrology."""
     
     def test_get_element_all_signs(self):
@@ -91,9 +91,9 @@ class TestChartGeneration(unittest.TestCase):
             longitude=-74.0060
         )
     
-    def test_create_cosmiclogical_subject_valid_data(self):
-        """Test creating cosmiclogical subject with valid data."""
-        subject = create_cosmiclogical_subject(self.birth_data)
+    def test_create_astrological_subject_valid_data(self):
+        """Test creating astrological subject with valid data."""
+        subject = create_astrological_subject(self.birth_data)
         
         self.assertIsNotNone(subject)
         # Check if subject has basic attributes (implementation details may vary)
@@ -102,8 +102,8 @@ class TestChartGeneration(unittest.TestCase):
         self.assertTrue(hasattr(subject, 'day'))
     
     @patch('astrology.logger')
-    def test_create_cosmiclogical_subject_invalid_data(self, mock_logger):
-        """Test creating cosmiclogical subject with invalid data."""
+    def test_create_astrological_subject_invalid_data(self, mock_logger):
+        """Test creating astrological subject with invalid data."""
         invalid_data = BirthData(
             birth_date='invalid-date',  # Invalid date format
             birth_time='25:70',  # Invalid time format
@@ -112,7 +112,7 @@ class TestChartGeneration(unittest.TestCase):
         )
         
         with self.assertRaises(Exception):
-            create_cosmiclogical_subject(invalid_data)
+            create_astrological_subject(invalid_data)
 
 
 class TestTransitGeneration(unittest.TestCase):

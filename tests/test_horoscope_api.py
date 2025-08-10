@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, AsyncMock
 from datetime import datetime
 from models import (
     BirthData, CurrentLocation, HoroscopeRequest, HoroscopeResponse, 
-    HoroscopePeriod, CosmiclogicalChart, PlanetPosition, HousePosition, SignData
+    HoroscopePeriod, AstrologicalChart, PlanetPosition, HousePosition, SignData
 )
 from contexts import build_horoscope_context
 from kerykeion.kr_types.kr_models import TransitsTimeRangeModel
@@ -62,7 +62,7 @@ class TestHoroscopeAPI(unittest.TestCase):
         self.mock_transit_model = self._create_mock_transit_model()
     
     def _create_mock_charts(self):
-        """Create mock cosmiclogical charts."""
+        """Create mock astrological charts."""
         charts = []
         
         for i in range(7):  # 7 days for weekly horoscope
@@ -99,7 +99,7 @@ class TestHoroscopeAPI(unittest.TestCase):
             moon_sign = SignData(name="Cancer", element="Water", modality="Cardinal", ruling_planet="Moon")
             ascendant = SignData(name="Leo", element="Fire", modality="Fixed", ruling_planet="Sun")
             
-            chart = CosmiclogicalChart(
+            chart = AstrologicalChart(
                 planets=planets,
                 houses=houses,
                 sunSign=sun_sign,
@@ -274,7 +274,7 @@ class TestHoroscopeAPI(unittest.TestCase):
         self.assertIn("specific_findings", context_system)
         
         # Check user context includes aspects and retrograde information
-        self.assertIn("cosmiclogical aspects", context_user)
+        self.assertIn("astrological aspects", context_user)
         self.assertIn("WEEK", context_user)
         
         # Parse the transits data from context to verify structure

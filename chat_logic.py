@@ -24,15 +24,15 @@ _kernel = None
 _chat_completion_service = None
 
 
-class CosmiclogyPlugin:
-    """Plugin providing cosmiclogical tools for Claude."""
+class AstrologyPlugin:
+    """Plugin providing astrological tools for Claude."""
     
     def __init__(self, user_birth_data: BirthData, current_location: CurrentLocation):
         self.user_birth_data = user_birth_data
         self.current_location = current_location
     
     @kernel_function(
-        description="Get transit aspects between the user's birth chart and current planetary positions for cosmiclogical timing guidance. Use this when the user asks about timing, current influences, what's happening now cosmiclogically, or wants guidance about current planetary energies and how they interact with their natal chart.",
+        description="Get transit aspects between the user's birth chart and current planetary positions for astrological timing guidance. Use this when the user asks about timing, current influences, what's happening now astrologically, or wants guidance about current planetary energies and how they interact with their natal chart.",
         name="get_transit"
     )
     def get_transits(self, period: HoroscopePeriod = HoroscopePeriod.week) -> str:
@@ -129,7 +129,7 @@ def validate_user_profile(profile: Optional[Dict[str, Any]]) -> None:
             detail="User profile not found. Please create a profile first."
         )
     
-    required_fields = ['birth_date', 'birth_time', 'latitude', 'longitude', 'cosmiclogical_chart']
+    required_fields = ['birth_date', 'birth_time', 'latitude', 'longitude', 'astrological_chart']
     missing_fields = []
     
     for field in required_fields:
@@ -319,7 +319,7 @@ def create_completion_response_data(full_response: str, transit_chart=None) -> s
     """
     transit_data = None
     if transit_chart:
-        # Convert CosmiclogicalChart to dict for JSON serialization
+        # Convert AstrologicalChart to dict for JSON serialization
         transit_data = transit_chart.model_dump() if hasattr(transit_chart, 'model_dump') else transit_chart
     
     response_data = {

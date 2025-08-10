@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
 from astrology import generate_birth_chart
-from models import AnalysisRequest, CosmiclogicalChart, BirthData, ChartAnalysis, DailyTransit, DailyTransitChange, HoroscopePeriod, PersonalityAnalysis, RelationshipAnalysis, CompositeAnalysis
+from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, DailyTransit, DailyTransitChange, HoroscopePeriod, PersonalityAnalysis, RelationshipAnalysis, CompositeAnalysis
 from config import get_logger
 from kerykeion.kr_types.kr_models import RelationshipScoreModel, TransitsTimeRangeModel   
 import json
@@ -9,11 +9,11 @@ import json
 logger = get_logger(__name__)
 
 def build_birth_chart_context(
-	subject: CosmiclogicalChart
+	subject: AstrologicalChart
 ) -> tuple[str, str]:
 	
 	system: str = """
-	You are an expert cosmicloger tasked with interpreting a person's cosmiclogical chart based on the
+	You are an expert cosmicloger tasked with interpreting a person's astrological chart based on the
 	positions of celestial bodies in different houses. You will receive a list of planets (including the
 	Sun and Moon) and their corresponding houses. Your job is to explain what it means for each
 	celestial body to be in its particular house and how it affects someone's personality.
@@ -46,12 +46,12 @@ def build_birth_chart_context(
 	</traits>
 	</interpretation>
 
-	Use appropriate cosmiclogical terminology and provide detailed explanations that demonstrate your
+	Use appropriate astrological terminology and provide detailed explanations that demonstrate your
 	expertise as an cosmicloger. Be sure to consider the unique qualities of each planet and how they
 	interact with the energies of their respective houses.
 
 	After interpreting all planet-house combinations, conclude with a brief overall summary of the
-	person's cosmiclogical profile based on these placements. Present this summary in <summary> tags.
+	person's astrological profile based on these placements. Present this summary in <summary> tags.
 
 	Remember to maintain a professional and insightful tone throughout your interpretation, as befitting
 	an expert cosmicloger.
@@ -165,7 +165,7 @@ def build_personality_context(
 	system = """
 	Your task is to analyze a birth chart and provide insights into the individual's personality, strengths, challenges, and life path. You
 	will be given a birth chart with planetary positions and aspects. Use this information to create a
-	comprehensive cosmiclogical analysis.
+	comprehensive astrological analysis.
 
 	Analyze the birth chart carefully, paying attention to the following elements:
 	1. Sun sign and its house position
@@ -226,8 +226,8 @@ def build_personality_context(
 	for personal growth.
 	</life_path>
 
-	Remember to use cosmiclogical terminology accurately but also explain concepts in a way that someone
-	with basic cosmiclogical knowledge can understand. Provide a balanced view, highlighting both
+	Remember to use astrological terminology accurately but also explain concepts in a way that someone
+	with basic astrological knowledge can understand. Provide a balanced view, highlighting both
 	positive attributes and potential challenges. Avoid making absolute predictions; instead, focus on
 	tendencies and potentials.
 
@@ -301,8 +301,8 @@ def parse_personality_response(response: str) -> PersonalityAnalysis:
 		raise ValueError("Error processing personality analysis response") from e
 
 def build_relationship_context(
-	chart_1: CosmiclogicalChart,
-	chart_2: CosmiclogicalChart,
+	chart_1: AstrologicalChart,
+	chart_2: AstrologicalChart,
 	score: RelationshipScoreModel,
 	relationship_type: str
 ) -> tuple[str, str]:
@@ -346,8 +346,8 @@ def build_relationship_context(
 	system = """
 	You are an AI assistant trained in astrology and cosmicnomy. Your task is to analyze the relationship compatibility between two individuals based on their birth charts. 
 	This relationship type can be romantic, friendship or professional. You will be provided with the relationship type.
-	You will also be provided with a relationship score, information about destiny signs, a list of cosmiclogical aspects contributing to the score and each person's birth chart information.
-	Use this information to create a comprehensive cosmiclogical analysis of their relationship compatibility.
+	You will also be provided with a relationship score, information about destiny signs, a list of astrological aspects contributing to the score and each person's birth chart information.
+	Use this information to create a comprehensive astrological analysis of their relationship compatibility.
 
 	Analyze the compatibility based on the provided information. Consider the following in your analysis:
 	1. The overall relationship score and its significance
@@ -383,7 +383,7 @@ def build_relationship_context(
 	The presence or absence of destiny signs and their impact
 	</destiny_signs>
 	<relationship_aspects>
-	Discuss the key cosmiclogical aspects contributing to the relationship score.
+	Discuss the key astrological aspects contributing to the relationship score.
 	</relationship_aspects>
 	<strengths>
 	Identify the strengths of the relationship based on the analysis.
@@ -392,7 +392,7 @@ def build_relationship_context(
 	Identify the challenges or potential areas of conflict in the relationship.
 	</challenges>
 	<areas_for_growth>
-	Potential areas for growth for the couple based on the cosmiclogical analysis.
+	Potential areas for growth for the couple based on the astrological analysis.
 	</areas_for_growth>
 	</analysis>
 
@@ -481,7 +481,7 @@ def build_chat_context(profile_data: Dict[str, str]) -> tuple[str, str]:
 
 	system = """
 	You are a knowledgeable and friendly cosmicloger. Most of all you are a friendly shoulder to talk to.
-	You may provide insightful and personalized cosmiclogical guidance to users based on their birth chart, recent horoscope, personality analysis,
+	You may provide insightful and personalized astrological guidance to users based on their birth chart, recent horoscope, personality analysis,
 	and relationship analysis. 
 	
 	Always maintain a warm, supportive, and mystical demeanor in your
@@ -489,7 +489,7 @@ def build_chat_context(profile_data: Dict[str, str]) -> tuple[str, str]:
 
 	When responding to user queries, follow these guidelines:
 
-	1. Only mention the cosmiclogical information when it is directly relevant to the user's question or
+	1. Only mention the astrological information when it is directly relevant to the user's question or
 	adds significant value to your response.
 	2. Use the information to provide more personalized and accurate answers, but don't overwhelm the
 	user with too much detail at once.
@@ -503,22 +503,22 @@ def build_chat_context(profile_data: Dict[str, str]) -> tuple[str, str]:
 	To respond to a user query, follow these steps:
 
 	1. Carefully read the user's question.
-	2. Identify if any cosmiclogical information (birth chart, horoscope, personality analysis,
+	2. Identify if any astrological information (birth chart, horoscope, personality analysis,
 	or relationship scores) is relevant to the query.
-	3. Formulate a response that addresses the user's question, only incorporate relevant cosmiclogical
+	3. Formulate a response that addresses the user's question, only incorporate relevant astrological
 	insights, when applicable to the question. A simple hello, should be answered by a similar response. 
 	You are not expected to overanalyze simple interactions.
-	4. If appropriate, offer gentle advice or suggestions based on the cosmiclogical information.
+	4. If appropriate, offer gentle advice or suggestions based on the astrological information.
 	5. Conclude with an encouraging or thought-provoking statement related to the user's query and
-	cosmiclogical profile.
+	astrological profile.
 
 	Present your response in the following format:
 
-	[Your detailed response here, incorporating relevant cosmiclogical insights and addressing the user's
+	[Your detailed response here, incorporating relevant astrological insights and addressing the user's
 	query]
 
 	Remember to always stay in character as a friendly and knowledgeable cosmicloger. Use the
-	cosmiclogical information judiciously to provide meaningful and personalized guidance without
+	astrological information judiciously to provide meaningful and personalized guidance without
 	overwhelming the user with technical details.
 	"""
 	user = """
@@ -543,19 +543,19 @@ def build_chat_context(profile_data: Dict[str, str]) -> tuple[str, str]:
 	Now respond to the user's query as instructed:
 	"""
 	return (system, user.format(
-		BIRTH_CHART=profile_data.get("cosmiclogical_chart", "No birth chart data available."),
+		BIRTH_CHART=profile_data.get("astrological_chart", "No birth chart data available."),
 		HOROSCOPE=horoscopes_to_string(profile_data.get("horoscopes")),
 		PERSONALITY_ANALYSIS=personality_analysis_to_string(profile_data.get("personality_analysis")),
 		RELATIONSHIPS=relationships_to_string(profile_data.get("relationships"))
 	))
 
 def build_composite_context(
-	composite_chart: CosmiclogicalChart
+	composite_chart: AstrologicalChart
 ) -> tuple[str, str]:
 	"""Build context for composite chart analysis request.
 	
 	Args:
-		composite_chart: CosmiclogicalChart object containing the composite chart data.
+		composite_chart: AstrologicalChart object containing the composite chart data.
 		
 	Returns:
 		Context string for Claude API with composite chart analysis.
@@ -656,7 +656,7 @@ def parse_composite_response(response: str) -> CompositeAnalysis:
 		raise ValueError("Error processing composite analysis response") from e
 
 def build_horoscope_context(
-	birth_chart: CosmiclogicalChart,
+	birth_chart: AstrologicalChart,
 	transit_changes: DailyTransitChange
 ) -> tuple[str, str]:
 	"""Build context for daily horoscope analysis based on transit data.
@@ -670,7 +670,7 @@ def build_horoscope_context(
 	
 	system = """
 	You are an expert cosmicloger tasked with creating a personalized daily horoscope based on changing
-	aspects and changes in retrograding planets. You will receive the user's birth chart and information about recent cosmiclogical
+	aspects and changes in retrograding planets. You will receive the user's birth chart and information about recent astrological
 	changes relevant to the birth chart. Your goal is to interpret this information and
 	create a meaningful, personalized horoscope for the user.
 
@@ -687,14 +687,14 @@ def build_horoscope_context(
 
 	3. Synthesize the information:
 	- Look for patterns or themes in the recent changes.
-	- Consider how these cosmiclogical shifts might manifest in the user's daily life.
+	- Consider how these astrological shifts might manifest in the user's daily life.
 
 	4. Create the horoscope:
 	- Write a paragraph (3-5 sentences) that captures the overall energy or theme for the day.
 	- Focus on 2-3 specific areas of life that are likely to be influenced by the recent changes.
-	- Offer gentle advice or suggestions based on the cosmiclogical influences.
+	- Offer gentle advice or suggestions based on the astrological influences.
 	- Keep the tone positive and empowering, even when discussing challenges.
-	- Use language that is accessible to a general audience, avoiding overly technical cosmiclogical
+	- Use language that is accessible to a general audience, avoiding overly technical astrological
 	terms.
 
 	5. Personalization:
@@ -704,7 +704,7 @@ def build_horoscope_context(
 	personal nature of the reading.
 
 	6. Closing:
-	- End with an encouraging statement or a positive affirmation related to the day's cosmiclogical
+	- End with an encouraging statement or a positive affirmation related to the day's astrological
 	influences.
 
 	<formatting>

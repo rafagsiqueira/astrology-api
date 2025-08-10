@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import json
 from datetime import datetime, date
-from models import BirthData, CurrentLocation, HoroscopePeriod, CosmiclogicalChart, PlanetPosition, HousePosition, SignData
+from models import BirthData, CurrentLocation, HoroscopePeriod, AstrologicalChart, PlanetPosition, HousePosition, SignData
 from contexts import build_horoscope_context
 from kerykeion.kr_types.kr_models import TransitsTimeRangeModel
 from config import get_claude_client
@@ -73,7 +73,7 @@ class TestBuildHoroscopeContext(unittest.TestCase):
         self.claude_client = get_claude_client()
     
     def _create_mock_charts(self):
-        """Create mock cosmiclogical charts."""
+        """Create mock astrological charts."""
         charts = []
         
         for i in range(3):
@@ -113,7 +113,7 @@ class TestBuildHoroscopeContext(unittest.TestCase):
             moon_sign = SignData(name="Cancer", element="Water", modality="Cardinal", ruling_planet="Moon")
             ascendant = SignData(name="Aries", element="Fire", modality="Cardinal", ruling_planet="Mars")
             
-            chart = CosmiclogicalChart(
+            chart = AstrologicalChart(
                 planets=planets,
                 houses=houses,
                 sunSign=sun_sign,

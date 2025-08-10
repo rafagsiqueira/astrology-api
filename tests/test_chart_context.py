@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import Mock
-from models import CosmiclogicalChart, PlanetPosition, HousePosition, SignData
+from models import AstrologicalChart, PlanetPosition, HousePosition, SignData
 from contexts import build_birth_chart_context, parse_chart_response
 
 
@@ -64,8 +64,8 @@ class TestBuildBirthChartContext:
             ruling_planet="Sun"
         )
         
-        # Create mock cosmiclogical chart
-        self.chart = CosmiclogicalChart(
+        # Create mock astrological chart
+        self.chart = AstrologicalChart(
             planets=self.planets,
             houses=self.houses,
             sunSign=self.sun_sign,
@@ -83,7 +83,7 @@ class TestBuildBirthChartContext:
         assert len(user) > 0
     
     def test_context_contains_required_elements(self):
-        """Test that the context contains required cosmiclogical elements."""
+        """Test that the context contains required astrological elements."""
         (cached, user) = build_birth_chart_context(self.chart)
         
         # Check for key instructional elements
@@ -139,7 +139,7 @@ class TestBuildBirthChartContext:
     
     def test_empty_planets_dict(self):
         """Test handling of empty planets dictionary."""
-        empty_chart = CosmiclogicalChart(
+        empty_chart = AstrologicalChart(
             planets={},
             houses=self.houses,
             sunSign=self.sun_sign,

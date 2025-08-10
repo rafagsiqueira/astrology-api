@@ -66,8 +66,8 @@ class ChartAnalysis(BaseModel):
     neptune: PlanetAnalysis
     pluto: PlanetAnalysis
 
-class CosmiclogicalChart(BaseModel):
-    """Complete cosmiclogical chart data."""
+class AstrologicalChart(BaseModel):
+    """Complete astrological chart data."""
     planets: Dict[str, PlanetPosition]
     houses: Dict[str, HousePosition]
     sunSign: SignData
@@ -84,7 +84,7 @@ class CosmiclogicalChart(BaseModel):
         houses_str = ", ".join([f"House {house.house}: {house.degree:.1f}° {house.sign}" 
                                for name, house in self.houses.items()])
         
-        return f"""Cosmiclogical Chart:
+        return f"""Astrological Chart:
 Sun Sign: {self.sunSign.name} ({self.sunSign.element}, {self.sunSign.modality})
 Moon Sign: {self.moonSign.name} ({self.moonSign.element}, {self.moonSign.modality})
 Ascendant: {self.ascendant.name} ({self.ascendant.element}, {self.ascendant.modality})
@@ -137,7 +137,7 @@ class LifePathSection(BaseModel):
     key_development_areas: List[str]
 
 class PersonalityAnalysis(BaseModel):
-    """Complete personality analysis based on cosmiclogical chart."""
+    """Complete personality analysis based on astrological chart."""
     overview: str
     personality_traits: PersonalityTraitsSection
     emotional_nature: EmotionalNatureSection
@@ -182,13 +182,13 @@ class ChatRole(Enum):
     SYSTEM = 'system'
 
 class ChatMessage(BaseModel):
-    """Chat message for cosmiclogical consultation."""
+    """Chat message for astrological consultation."""
     role: ChatRole
     content: str
     timestamp: datetime
 
 class ChatResponse(BaseModel):
-    """Response from the cosmiclogical chat API."""
+    """Response from the astrological chat API."""
     response: str
     timestamp: datetime
 
@@ -202,7 +202,7 @@ class UserProfile(BaseModel):
     longitude: float
     created_at: datetime
     updated_at: datetime
-    cosmiclogical_chart: Optional[CosmiclogicalChart] = None
+    astrological_chart: Optional[AstrologicalChart] = None
     personality_analysis: Optional[PersonalityAnalysis] = None
     partners: Optional[List["PartnerData"]] = []
 
@@ -215,7 +215,7 @@ class PartnerData(BaseModel):
     latitude: float
     longitude: float
     created_at: datetime
-    cosmiclogical_chart: Optional[CosmiclogicalChart] = None
+    astrological_chart: Optional[AstrologicalChart] = None
 
 class AddPartnerRequest(BaseModel):
     """Request to add a partner to user profile."""

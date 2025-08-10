@@ -56,7 +56,7 @@ class TestChatBusinessLogic:
         assert "longitude" in exc_info.value.detail
 
     def test_build_chat_context_with_data(self):
-        """Test chat context building with cosmiclogical data"""
+        """Test chat context building with astrological data"""
         context_data = {
             "birth_chart": "Sun in Aquarius, Moon in Gemini...",
             "current_data": "Mars in Leo, Venus in Virgo..."
@@ -72,7 +72,7 @@ class TestChatBusinessLogic:
         assert context_data["current_data"] in context
     
     def test_build_chat_context_without_data(self):
-        """Test chat context building without cosmiclogical data"""
+        """Test chat context building without astrological data"""
         context = build_chat_context(None)
         
         assert "knowledgeable and friendly cosmicloger" in context
@@ -138,8 +138,8 @@ class TestChatBusinessLogic:
         assert data["type"] == "error"
         assert data["data"]["error"] == error_message
     
-    def test_build_cosmiclogical_context(self):
-        """Test building cosmiclogical context from profile and location"""
+    def test_build_astrological_context(self):
+        """Test building astrological context from profile and location"""
         profile = {
             'birth_date': '1990-01-01',
             'birth_time': '12:00',
@@ -149,7 +149,7 @@ class TestChatBusinessLogic:
         }
         current_location = CurrentLocation(latitude=40.7128, longitude=-74.0060)
         
-        context_data, current_chart = build_cosmiclogical_context(profile, current_location)
+        context_data, current_chart = build_astrological_context(profile, current_location)
         
         # Verify the structure of returned data
         assert isinstance(context_data, dict)

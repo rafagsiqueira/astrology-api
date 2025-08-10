@@ -1,4 +1,4 @@
-"""Cosmiclogy module for chart generation."""
+"""Astrology module for chart generation."""
 
 from datetime import datetime
 from typing import List
@@ -13,7 +13,7 @@ from timezonefinder import TimezoneFinder
 from config import get_logger
 from models import (
     BirthData, CurrentLocation, DailyTransit, HoroscopePeriod, PlanetPosition, HousePosition, 
-    CosmiclogicalChart, SignData, CompositeAnalysisRequest, DailyTransitChange, TransitChanges, RetrogradeChanges
+    AstrologicalChart, SignData, CompositeAnalysisRequest, DailyTransitChange, TransitChanges, RetrogradeChanges
 )
 
 logger = get_logger(__name__)
@@ -62,7 +62,7 @@ def get_ruler(sign: str) -> str:
     }
     return rulers.get(sign, 'Unknown')
 
-def create_cosmiclogical_subject(
+def create_astrological_subject(
     birth_data: BirthData,
     name: str = "User",
 ) -> AstrologicalSubject:
@@ -87,7 +87,7 @@ def create_cosmiclogical_subject(
     date = datetime.fromisoformat(f"{birth_data.birth_date} {birth_data.birth_time}")
     logger.debug(f"Creating AstrologicalSubject with timezone: {timezone}, local_date: {date}")
     
-    # Create cosmiclogical subject using local time components
+    # Create astrological subject using local time components
     return AstrologicalSubject(
         name=name,
         year=date.year,
@@ -110,7 +110,7 @@ def generate_transits(birth_data: BirthData, current_location: CurrentLocation, 
     Returns:
         TransitsTimeRangeModel object
     """
-    subject = create_cosmiclogical_subject(birth_data=birth_data)
+    subject = create_astrological_subject(birth_data=birth_data)
 
     lookback = start_date - timedelta(days=1)
     end_date = start_date + timedelta(days=1)
@@ -245,8 +245,8 @@ def diff_transits(transits: list[DailyTransit]) -> list[DailyTransitChange]:
     
     return diff_results
 
-def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_svg: bool = True) -> CosmiclogicalChart:
-    """Convert an AstrologicalSubject to an CosmiclogicalChart."""
+def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_svg: bool = True) -> AstrologicalChart:
+    """Convert an AstrologicalSubject to an AstrologicalChart."""
     try:
         # Process planets data
         planets_dict = {}
@@ -340,7 +340,7 @@ def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_
                 except Exception as storage_error:
                     logger.error(f"Error uploading chart to storage: {storage_error}")
         
-        return CosmiclogicalChart(
+        return AstrologicalChart(
             planets=planets_dict,
             houses=houses_dict,
             sunSign=sun_sign,
@@ -354,12 +354,12 @@ def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_
         logger.error(f"Failed to convert subject to chart: {e}")
         raise
 
-def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> CosmiclogicalChart:
-    """Generate a complete cosmiclogical chart from birth data."""
+def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> AstrologicalChart:
+    """Generate a complete astrological chart from birth data."""
     try:
         logger.debug(f"Generating birth chart for coordinates {birth_data.latitude}, {birth_data.longitude}")
         
-        user_subject = create_cosmiclogical_subject(
+        user_subject = create_astrological_subject(
             birth_data=birth_data,
             name="User"
         )
@@ -370,18 +370,18 @@ def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> Cosmic
         logger.error(f"Failed to generate birth chart: {e}")
         raise
 
-def generate_composite_chart(request: CompositeAnalysisRequest, with_svg: bool = True) -> CosmiclogicalChart:
+def generate_composite_chart(request: CompositeAnalysisRequest, with_svg: bool = True) -> AstrologicalChart:
     """Generate a composite chart from two people's birth data using midpoint method."""
     try:
         logger.debug(f"Generating composite chart between two subjects")
         
         # Create AstrologicalSubjects for both people
-        person1_subject = create_cosmiclogical_subject(
+        person1_subject = create_astrological_subject(
             birth_data=request.person1_birth_data,
             name="Person1"
         )
         
-        person2_subject = create_cosmiclogical_subject(
+        person2_subject = create_astrological_subject(
             birth_data=request.person2_birth_data,
             name="Person2"
         )
@@ -390,7 +390,7 @@ def generate_composite_chart(request: CompositeAnalysisRequest, with_svg: bool =
         composite_factory = CompositeSubjectFactory(person1_subject, person2_subject)
         composite_subject = composite_factory.get_midpoint_composite_subject_model()
         
-        # Convert to CosmiclogicalChart
+        # Convert to AstrologicalChart
         composite_chart = subject_to_chart(subject=composite_subject, with_svg=with_svg)
         
         logger.debug("Composite chart generated successfully")

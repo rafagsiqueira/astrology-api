@@ -11,12 +11,12 @@ from contexts import build_birth_chart_context, build_chat_context, build_horosc
 from profile_cache import cache, get_user_profile_cached
 from analytics_service import get_analytics_service
 from appstore_notifications import get_notification_handler
-from astrology import create_cosmiclogical_subject, create_cosmiclogical_subject, generate_birth_chart, generate_composite_chart, generate_transits, diff_transits
+from astrology import create_astrological_subject, create_astrological_subject, generate_birth_chart, generate_composite_chart, generate_transits, diff_transits
 
 from config import get_logger, get_claude_client
 from auth import verify_firebase_token, get_firestore_client, validate_database_availability
 from models import (
-    BirthData, CosmiclogicalChart, CurrentLocation, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
+    BirthData, AstrologicalChart, CurrentLocation, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
     RelationshipAnalysisRequest, HoroscopeRequest, HoroscopeResponse, CompositeAnalysisRequest, CompositeAnalysis,
     DailyTransitRequest, DailyTransitResponse, DailyHoroscopeRequest, DailyHoroscopeResponse,
     GenerateHoroscopeRequest, GenerateHoroscopeResponse
@@ -185,12 +185,12 @@ async def root():
     """Root endpoint."""
     return {"message": "Cosmic Guru API is running"}
 
-@router.post("/api/generate-chart", response_model=CosmiclogicalChart)
+@router.post("/api/generate-chart", response_model=AstrologicalChart)
 async def generate_chart_endpoint(
     birth_data: BirthData,
     user: dict = Depends(verify_firebase_token)
 ):
-    """Generate an cosmiclogical chart from birth data."""
+    """Generate an astrological chart from birth data."""
     logger.debug(f"Received birth data: {birth_data}")
     
     claude_client = get_claude_client()
@@ -246,7 +246,7 @@ async def analyze_personality(
     request: AnalysisRequest,
     user: dict = Depends(verify_firebase_token)
 ):
-    """Analyze personality based on cosmiclogical chart."""
+    """Analyze personality based on astrological chart."""
     logger.debug(f"Analyzing personality for user: {user['uid']}")
 
     claude_client = get_claude_client()
@@ -307,8 +307,8 @@ async def analyze_relationship(
     
     try:
 
-        person1 = create_cosmiclogical_subject(request.person1, "Person1")
-        person2 = create_cosmiclogical_subject(request.person2, "Person2")
+        person1 = create_astrological_subject(request.person1, "Person1")
+        person2 = create_astrological_subject(request.person2, "Person2")
         # Use RelationshipScoreFactory for comprehensive analysis
         score_result = RelationshipScoreFactory(person1, person2).get_relationship_score()
 
@@ -422,7 +422,7 @@ async def analyze_composite(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to analyze composite: {str(e)}")
 
-@router.post("/api/generate-composite-chart", response_model=CosmiclogicalChart)
+@router.post("/api/generate-composite-chart", response_model=AstrologicalChart)
 async def generate_composite_chart_endpoint(
     request: CompositeAnalysisRequest,
     user: dict = Depends(verify_firebase_token)

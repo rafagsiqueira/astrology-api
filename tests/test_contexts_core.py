@@ -14,7 +14,7 @@ from contexts import (
     build_horoscope_context
 )
 from models import (
-    CosmiclogicalChart, PlanetPosition, HousePosition, SignData,
+    AstrologicalChart, PlanetPosition, HousePosition, SignData,
     PersonalityAnalysis, RelationshipAnalysis, CompositeAnalysis,
     BirthData, DailyTransit, AnalysisRequest, DailyTransitChange, TransitChanges, RetrogradeChanges
 )
@@ -28,7 +28,7 @@ class TestBirthChartContext(unittest.TestCase):
         self.mock_chart = self._create_mock_chart()
     
     def _create_mock_chart(self):
-        """Create a mock cosmiclogical chart for testing."""
+        """Create a mock astrological chart for testing."""
         planets = {
             'sun': PlanetPosition(
                 name='Sun',
@@ -49,7 +49,7 @@ class TestBirthChartContext(unittest.TestCase):
             '2': HousePosition(house=2, sign='Sagittarius', degree=10.0)
         }
         
-        return CosmiclogicalChart(
+        return AstrologicalChart(
             planets=planets,
             houses=houses,
             sunSign=SignData(name='Leo', element='Fire', modality='Fixed', ruling_planet='Sun'),
@@ -91,7 +91,7 @@ class TestBirthChartContext(unittest.TestCase):
     
     def test_build_birth_chart_context_empty_chart(self):
         """Test context building with empty chart data."""
-        empty_chart = CosmiclogicalChart(
+        empty_chart = AstrologicalChart(
             planets={},
             houses={},
             sunSign=SignData(name='Unknown', element='Unknown', modality='Unknown', ruling_planet='Unknown'),
@@ -122,7 +122,7 @@ class TestPersonalityContext(unittest.TestCase):
             'mercury': PlanetPosition(name='Mercury', sign='Gemini', house=3, degree=18.2)
         }
         
-        return CosmiclogicalChart(
+        return AstrologicalChart(
             planets=planets,
             houses={},
             sunSign=SignData(name='Gemini', element='Air', modality='Mutable', ruling_planet='Mercury'),
@@ -161,7 +161,7 @@ class TestRelationshipContext(unittest.TestCase):
     
     def _create_user_chart(self):
         """Create mock user chart."""
-        return CosmiclogicalChart(
+        return AstrologicalChart(
             planets={
                 'sun': PlanetPosition(name='Sun', sign='Aries', house=1, degree=10.0),
                 'moon': PlanetPosition(name='Moon', sign='Libra', house=7, degree=15.0)
@@ -175,7 +175,7 @@ class TestRelationshipContext(unittest.TestCase):
     
     def _create_partner_chart(self):
         """Create mock partner chart."""
-        return CosmiclogicalChart(
+        return AstrologicalChart(
             planets={
                 'sun': PlanetPosition(name='Sun', sign='Cancer', house=4, degree=20.0),
                 'moon': PlanetPosition(name='Moon', sign='Capricorn', house=10, degree=25.0)
@@ -234,7 +234,7 @@ class TestChatContext(unittest.TestCase):
         
         self.assertIsInstance(system, str)
         self.assertIsInstance(user, str)
-        self.assertIn('cosmiclogical', system.lower())
+        self.assertIn('astrological', system.lower())
     
     def test_build_chat_context_empty_profile(self):
         """Test chat context with empty profile."""
@@ -255,7 +255,7 @@ class TestCompositeContext(unittest.TestCase):
     
     def _create_mock_composite_chart(self):
         """Create mock composite chart."""
-        return CosmiclogicalChart(
+        return AstrologicalChart(
             planets={
                 'sun': PlanetPosition(name='Sun', sign='Virgo', house=6, degree=12.0)
             },
@@ -303,7 +303,7 @@ class TestDailyHoroscopeContext(unittest.TestCase):
         from models import DailyTransitChange, TransitChanges, RetrogradeChanges
         
         # Create a mock birth chart
-        mock_birth_chart = CosmiclogicalChart(
+        mock_birth_chart = AstrologicalChart(
             planets={
                 'sun': PlanetPosition(name='Sun', sign='Gemini', house=3, degree=12.5),
                 'moon': PlanetPosition(name='Moon', sign='Pisces', house=12, degree=8.3)
@@ -330,7 +330,7 @@ class TestDailyHoroscopeContext(unittest.TestCase):
         self.assertIsInstance(system, str)
         self.assertIsInstance(user, str)
         self.assertIn('horoscope', system.lower())
-        self.assertIn('cosmiclogical', system.lower())
+        self.assertIn('astrological', system.lower())
 
 
 if __name__ == '__main__':

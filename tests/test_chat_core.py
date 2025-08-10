@@ -6,7 +6,7 @@ import json
 from unittest.mock import Mock, patch, MagicMock, AsyncMock
 from datetime import datetime
 
-from models import ChatMessage, CosmiclogicalChart
+from models import ChatMessage, AstrologicalChart
 
 # Mock semantic kernel components since they might not be available
 class MockAuthorRole:

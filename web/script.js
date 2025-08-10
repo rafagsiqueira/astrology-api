@@ -18,7 +18,7 @@ const reviews = [
         name: "Luna P.",
         location: "Portland, OR",
         rating: 5,
-        text: "As someone who's studied astrology for years, I'm impressed by the accuracy and depth of insights. The interface is beautiful and intuitive. This app respects the complexity of cosmiclogical wisdom.",
+        text: "As someone who's studied astrology for years, I'm impressed by the accuracy and depth of insights. The interface is beautiful and intuitive. This app respects the complexity of astrological wisdom.",
         initial: "L"
     },
     {
