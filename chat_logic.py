@@ -24,15 +24,15 @@ _kernel = None
 _chat_completion_service = None
 
 
-class AstrologyPlugin:
-    """Plugin providing astrological tools for Claude."""
+class CosmiclogyPlugin:
+    """Plugin providing cosmiclogical tools for Claude."""
     
     def __init__(self, user_birth_data: BirthData, current_location: CurrentLocation):
         self.user_birth_data = user_birth_data
         self.current_location = current_location
     
     @kernel_function(
-        description="Get transit aspects between the user's birth chart and current planetary positions for astrological timing guidance. Use this when the user asks about timing, current influences, what's happening now astrologically, or wants guidance about current planetary energies and how they interact with their natal chart.",
+        description="Get transit aspects between the user's birth chart and current planetary positions for cosmiclogical timing guidance. Use this when the user asks about timing, current influences, what's happening now cosmiclogically, or wants guidance about current planetary energies and how they interact with their natal chart.",
         name="get_transit"
     )
     def get_transits(self, period: HoroscopePeriod = HoroscopePeriod.week) -> str:
@@ -48,7 +48,7 @@ class AstrologyPlugin:
         # (model, ) = generate_transits(self.user_birth_data, self.current_location, period=period)
         return ""
 
-def get_semantic_kernel(birth_data: Optional[BirthData] = None, current_location: Optional[CurrentLocation] = None) -> Kernel:
+def get_semantic_kernel() -> Kernel:
     """Get or create the semantic kernel instance with optional astrology plugin.
     
     Args:
@@ -79,16 +79,6 @@ def get_semantic_kernel(birth_data: Optional[BirthData] = None, current_location
             logger.debug("Semantic kernel initialized with Anthropic service")
         else:
             raise ValueError("ANTHROPIC_API_KEY not found - cannot initialize semantic kernel")
-    
-    # Add astrology plugin if birth data and location are provided and plugin not already added
-    if (birth_data and current_location and 
-        not any(plugin_name == "astrology" for plugin_name in _kernel.plugins.keys())):
-        try:
-            astrology_plugin = AstrologyPlugin(birth_data, current_location)
-            _kernel.add_plugin(astrology_plugin, plugin_name="astrology")
-            logger.debug("Astrology plugin added to semantic kernel")
-        except Exception as e:
-            logger.warning(f"Failed to add astrology plugin: {e}")
     
     return _kernel
 
@@ -139,7 +129,7 @@ def validate_user_profile(profile: Optional[Dict[str, Any]]) -> None:
             detail="User profile not found. Please create a profile first."
         )
     
-    required_fields = ['birth_date', 'birth_time', 'latitude', 'longitude', 'timezone']
+    required_fields = ['birth_date', 'birth_time', 'latitude', 'longitude', 'cosmiclogical_chart']
     missing_fields = []
     
     for field in required_fields:
@@ -317,73 +307,6 @@ def create_error_response_data(error_message: str) -> str:
     """
     return f"data: {json.dumps({'type': 'error', 'data': {'error': error_message}})}\n\n"
 
-
-async def generate_semantic_kernel_streaming_response(
-    chat_history: ChatHistory, 
-    system_message: str,
-    birth_data: Optional[BirthData] = None,
-    current_location: Optional[CurrentLocation] = None,
-    current_chart=None
-) -> AsyncGenerator[str, None]:
-    """Generate streaming response using Semantic Kernel with function calling support.
-    
-    Args:
-        chat_history: ChatHistory object with conversation
-        system_message: System prompt for Claude
-        user_birth_data: Optional user birth data for synastry calculations
-        current_location: Optional current location for synastry calculations
-        current_chart: Optional current planetary chart
-        
-    Yields:
-        SSE-formatted response chunks
-    """
-    try:
-        # Get the kernel with astrology plugin if birth data is provided
-        kernel = get_semantic_kernel(birth_data, current_location)
-        
-        # Get the chat completion service
-        chat_completion = get_chat_completion_service()
-        
-        # Add system message to chat history if provided
-        if system_message:
-            # Insert system message at the beginning
-            system_chat_message = ChatMessageContent(
-                role=AuthorRole.SYSTEM,
-                content=system_message
-            )
-            chat_history.messages.insert(0, system_chat_message)
-        
-        # Stream the response
-        accumulated_response = ""
-        
-        # Get default settings for the chat completion service
-        from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
-        
-        settings = PromptExecutionSettings(
-            service_id="anthropic_chat",
-            ai_model_id="claude-3-5-sonnet-20241022",
-            max_tokens=1000,
-            temperature=0.7
-        )
-        
-        async for chunk in chat_completion.get_streaming_chat_message_content(
-            chat_history=chat_history,
-            settings=settings,
-            kernel=kernel
-        ):
-            if chunk and chunk.content:
-                text_chunk = str(chunk.content)
-                accumulated_response += text_chunk
-                yield create_streaming_response_data(text_chunk)
-        
-        # Send completion event
-        yield create_completion_response_data(accumulated_response, current_chart)
-        
-    except Exception as e:
-        logger.error(f"Error in semantic kernel streaming: {e}")
-        yield create_error_response_data(str(e))
-
-
 def create_completion_response_data(full_response: str, transit_chart=None) -> str:
     """Create SSE-formatted completion data chunk.
     
@@ -396,7 +319,7 @@ def create_completion_response_data(full_response: str, transit_chart=None) -> s
     """
     transit_data = None
     if transit_chart:
-        # Convert AstrologicalChart to dict for JSON serialization
+        # Convert CosmiclogicalChart to dict for JSON serialization
         transit_data = transit_chart.model_dump() if hasattr(transit_chart, 'model_dump') else transit_chart
     
     response_data = {

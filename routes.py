@@ -11,16 +11,16 @@ from contexts import build_birth_chart_context, build_chat_context, build_horosc
 from profile_cache import cache, get_user_profile_cached
 from analytics_service import get_analytics_service
 from appstore_notifications import get_notification_handler
-from astrology import create_astrological_subject
+from astrology import create_cosmiclogical_subject, create_cosmiclogical_subject, generate_birth_chart, generate_composite_chart, generate_transits, diff_transits
 
 from config import get_logger, get_claude_client
 from auth import verify_firebase_token, get_firestore_client, validate_database_availability
 from models import (
-    BirthData, AstrologicalChart, CurrentLocation, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
+    BirthData, CosmiclogicalChart, CurrentLocation, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
     RelationshipAnalysisRequest, HoroscopeRequest, HoroscopeResponse, CompositeAnalysisRequest, CompositeAnalysis,
-    DailyTransitRequest, DailyTransitResponse, DailyHoroscopeRequest, DailyHoroscopeResponse
+    DailyTransitRequest, DailyTransitResponse, DailyHoroscopeRequest, DailyHoroscopeResponse,
+    GenerateHoroscopeRequest, GenerateHoroscopeResponse
 )
-from astrology import create_astrological_subject, generate_birth_chart, generate_composite_chart, generate_transits
 from chat_logic import (
     validate_user_profile,
     load_chat_history_from_firebase,
@@ -31,6 +31,88 @@ logger = get_logger(__name__)
 
 # Create router
 router = APIRouter()
+
+
+async def enhance_profile_with_chat_context(user_id: str, profile: dict, db) -> dict:
+    """Enhance user profile with additional context data for chat.
+    
+    Args:
+        user_id: Firebase user ID
+        profile: Base user profile dictionary
+        db: Firestore database client
+        
+    Returns:
+        Enhanced profile dictionary with horoscopes, personality_analysis, and relationships
+    """
+    if not profile:
+        profile = {}
+    
+    try:
+        # Get user document reference
+        user_doc_ref = db.collection('user_profiles').document(user_id)
+        
+        # Retrieve horoscopes subcollection
+        horoscopes_data = None
+        try:
+            horoscopes_ref = user_doc_ref.collection('horoscopes')
+            horoscopes_docs = horoscopes_ref.get()
+            if horoscopes_docs:
+                horoscopes_data = {}
+                for doc in horoscopes_docs:
+                    if doc.exists:
+                        horoscopes_data[doc.id] = doc.to_dict()
+        except Exception as e:
+            logger.debug(f"No horoscopes found for user {user_id}: {e}")
+        
+        # Retrieve relationships subcollection
+        relationships_data = None
+        try:
+            relationships_ref = db.collection('relationships').where('partner_1_uid', '==', user_id)
+            relationships_docs = relationships_ref.get()
+            relationships_list = []
+            for doc in relationships_docs:
+                if doc.exists:
+                    relationships_list.append(doc.to_dict())
+            
+            # Also check where user is partner_2
+            relationships_ref_2 = db.collection('relationships').where('partner_2_uid', '==', user_id)
+            relationships_docs_2 = relationships_ref_2.get()
+            for doc in relationships_docs_2:
+                if doc.exists:
+                    relationships_list.append(doc.to_dict())
+            
+            if relationships_list:
+                relationships_data = relationships_list
+        except Exception as e:
+            logger.debug(f"No relationships found for user {user_id}: {e}")
+        
+        # Add the retrieved data to profile
+        if horoscopes_data:
+            profile['horoscopes'] = horoscopes_data
+        if relationships_data:
+            profile['relationships'] = relationships_data
+        
+        # personality_analysis should already be in the profile from the base query
+        # but let's ensure it's properly handled if missing
+        if 'personality_analysis' not in profile or not profile['personality_analysis']:
+            try:
+                # Try to get it from the main user document if not already there
+                user_doc = user_doc_ref.get()
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    if user_data and 'personality_analysis' in user_data:
+                        profile['personality_analysis'] = user_data['personality_analysis']
+            except Exception as e:
+                logger.debug(f"Could not retrieve personality analysis for user {user_id}: {e}")
+        
+        logger.debug(f"Enhanced profile for user {user_id} with additional context data")
+        
+    except Exception as e:
+        logger.error(f"Error enhancing profile with chat context for user {user_id}: {e}")
+        # Continue with original profile if enhancement fails
+    
+    return profile
+
 
 def assert_stop_reason_end_turn(response):
     """Assert that the Claude API response has stop_reason 'end_turn'.
@@ -103,12 +185,12 @@ async def root():
     """Root endpoint."""
     return {"message": "Cosmic Guru API is running"}
 
-@router.post("/api/generate-chart", response_model=AstrologicalChart)
+@router.post("/api/generate-chart", response_model=CosmiclogicalChart)
 async def generate_chart_endpoint(
     birth_data: BirthData,
     user: dict = Depends(verify_firebase_token)
 ):
-    """Generate an astrological chart from birth data."""
+    """Generate an cosmiclogical chart from birth data."""
     logger.debug(f"Received birth data: {birth_data}")
     
     claude_client = get_claude_client()
@@ -164,7 +246,7 @@ async def analyze_personality(
     request: AnalysisRequest,
     user: dict = Depends(verify_firebase_token)
 ):
-    """Analyze personality based on astrological chart."""
+    """Analyze personality based on cosmiclogical chart."""
     logger.debug(f"Analyzing personality for user: {user['uid']}")
 
     claude_client = get_claude_client()
@@ -225,8 +307,8 @@ async def analyze_relationship(
     
     try:
 
-        person1 = create_astrological_subject(request.person1, "Person1")
-        person2 = create_astrological_subject(request.person2, "Person2")
+        person1 = create_cosmiclogical_subject(request.person1, "Person1")
+        person2 = create_cosmiclogical_subject(request.person2, "Person2")
         # Use RelationshipScoreFactory for comprehensive analysis
         score_result = RelationshipScoreFactory(person1, person2).get_relationship_score()
 
@@ -340,7 +422,7 @@ async def analyze_composite(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to analyze composite: {str(e)}")
 
-@router.post("/api/generate-composite-chart", response_model=AstrologicalChart)
+@router.post("/api/generate-composite-chart", response_model=CosmiclogicalChart)
 async def generate_composite_chart_endpoint(
     request: CompositeAnalysisRequest,
     user: dict = Depends(verify_firebase_token)
@@ -360,11 +442,11 @@ async def generate_composite_chart_endpoint(
         raise HTTPException(status_code=500, detail=f"Failed to generate composite chart: {str(e)}")
 
 @router.post("/api/chat")
-async def chat_with_astrologer(
+async def chat_with_cosmicloger(
     request: ChatRequest,
     user: dict = Depends(verify_firebase_token),
 ):
-    """Chat with AI astrologer using Semantic Kernel."""
+    """Chat with AI cosmicloger using Semantic Kernel."""
     logger.debug(f"Chat request from user: {user['uid']}")
 
     claude_client = get_claude_client()
@@ -374,13 +456,16 @@ async def chat_with_astrologer(
     try:
         # Get database connection
         db = get_firestore_client()
-        validate_database_availability(db)
+        validate_database_availability()
         
         # Get user profile with caching for context
         profile = get_user_profile_cached(user['uid'], db)
         
         # Validate profile completeness
         validate_user_profile(profile)
+        
+        # Enhance profile with additional context data for chat
+        profile = await enhance_profile_with_chat_context(user['uid'], profile, db)
         
         # Load existing chat history from Firebase or create new one
         assert db is not None, "Database client is None"
@@ -492,8 +577,11 @@ async def get_daily_transits(
             period=request.period
         )
         
-        # Return transits in the expected response format
-        response = DailyTransitResponse(transits=transits)
+        # Generate transit changes (diff)
+        changes = diff_transits(transits)
+        
+        # Return transits with changes in the expected response format
+        response = DailyTransitResponse(transits=transits, changes=changes)
         
         logger.debug(f"Daily transit data generated successfully: {len(transits)} transits")
         return response
@@ -502,6 +590,63 @@ async def get_daily_transits(
         logger.error(f"Error generating daily transits: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to generate daily transits: {str(e)}")
+
+@router.post("/api/generate-horoscope", response_model=GenerateHoroscopeResponse)
+async def generate_horoscope(
+    request: GenerateHoroscopeRequest,
+    user: dict = Depends(verify_firebase_token)
+):
+    """Generate a personalized horoscope based on transit changes."""
+    try:
+        logger.info(f"Generating horoscope for transit changes on {request.transit_changes.date}")
+        
+        # Validate Claude client
+        claude_client = get_claude_client()
+        if not claude_client:
+            raise HTTPException(status_code=503, detail="Horoscope generation service not available")
+        
+        birth_chart = generate_birth_chart(request.birth_data, with_svg=False)
+
+        # Build context for Claude
+        system_prompt, user_prompt = build_horoscope_context(birth_chart=birth_chart, transit_changes=request.transit_changes)
+        
+        logger.debug("Calling Claude API for horoscope generation")
+        
+        # Call Claude API with analytics tracking
+        response = await call_claude_with_analytics(
+            claude_client=claude_client,
+            endpoint_name="generate-horoscope",
+            user_id=user['uid'],
+            model="claude-3-5-haiku-latest",
+            max_tokens=1000,
+            temperature=0.7,
+            system=[
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
+            messages=[{
+                "role": "user", 
+                "content": user_prompt
+            }]
+        )
+        
+        # Extract horoscope text from Claude response
+        horoscope_text = response.content[0].text if response.content else "Unable to generate horoscope at this time."
+        
+        logger.debug(f"Horoscope generated successfully for date {request.transit_changes.date}")
+        
+        return GenerateHoroscopeResponse(
+            horoscope_text=horoscope_text,
+            target_date=request.transit_changes.date
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating horoscope: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to generate horoscope: {str(e)}")
 
 @router.post("/api/appstore-notifications")
 async def handle_appstore_notifications(request: dict):

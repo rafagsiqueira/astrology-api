@@ -4,7 +4,7 @@ const reviews = [
         name: "Sarah M.",
         location: "San Francisco, CA",
         rating: 5,
-        text: "Cosmic Guru has completely changed how I understand myself! The birth chart analysis was incredibly detailed and accurate. The AI chat feature feels like having a personal astrologer available 24/7.",
+        text: "Cosmic Guru has completely changed how I understand myself! The birth chart analysis was incredibly detailed and accurate. The AI chat feature feels like having a personal cosmicloger available 24/7.",
         initial: "S"
     },
     {
@@ -18,7 +18,7 @@ const reviews = [
         name: "Luna P.",
         location: "Portland, OR",
         rating: 5,
-        text: "As someone who's studied astrology for years, I'm impressed by the accuracy and depth of insights. The interface is beautiful and intuitive. This app respects the complexity of astrological wisdom.",
+        text: "As someone who's studied astrology for years, I'm impressed by the accuracy and depth of insights. The interface is beautiful and intuitive. This app respects the complexity of cosmiclogical wisdom.",
         initial: "L"
     },
     {

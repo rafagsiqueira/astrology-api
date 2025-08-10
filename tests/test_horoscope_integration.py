@@ -394,7 +394,7 @@ class TestHoroscopeIntegration(unittest.TestCase):
     
     def _create_realistic_charts_response(self, num_charts):
         """Create realistic charts response for testing."""
-        from models import AstrologicalChart, PlanetPosition, HousePosition, SignData
+        from models import CosmiclogicalChart, PlanetPosition, HousePosition, SignData
         
         charts = []
         
@@ -432,7 +432,7 @@ class TestHoroscopeIntegration(unittest.TestCase):
             moon_sign = SignData(name="Cancer", element="Water", modality="Cardinal", ruling_planet="Moon")
             ascendant = SignData(name="Leo", element="Fire", modality="Fixed", ruling_planet="Sun")
             
-            chart = AstrologicalChart(
+            chart = CosmiclogicalChart(
                 planets=planets,
                 houses=houses,
                 sunSign=sun_sign,

@@ -4,11 +4,11 @@ import unittest
 from unittest.mock import Mock, patch
 from datetime import datetime
 from models import (
-    HoroscopePeriod, AstrologicalChart, PlanetPosition, HousePosition, SignData
+    HoroscopePeriod, CosmiclogicalChart, PlanetPosition, HousePosition, SignData
 )
 from contexts import build_horoscope_context
 from kerykeion.kr_types.kr_models import TransitsTimeRangeModel
-import tiktoken
+from config import get_claude_client
 
 
 class MockComplexAspect:
@@ -35,12 +35,23 @@ class TestHoroscopeEdgeCases(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
-        # Initialize token encoder for Claude cost estimation
-        self.encoder = tiktoken.encoding_for_model("gpt-4")
+        # Initialize Claude client for token counting
+        self.claude_client = get_claude_client()
     
     def count_tokens(self, text):
-        """Count tokens in text using tiktoken."""
-        return len(self.encoder.encode(text))
+        """Count tokens in text using Claude's token counting."""
+        try:
+            response = self.claude_client.messages.count_tokens(
+                model="claude-3-5-sonnet-20241022",
+                messages=[{
+                    "role": "user", 
+                    "content": text
+                }]
+            )
+            return response.input_tokens
+        except Exception as e:
+            # Fallback: rough approximation (4 chars per token)
+            return len(text) // 4
     
     def test_horoscope_context_with_missing_aspect_attributes(self):
         """Test horoscope context generation when aspects have missing attributes."""
@@ -305,7 +316,7 @@ class TestHoroscopeEdgeCases(unittest.TestCase):
         self.assertLess(year_tokens, week_tokens * 5, "Yearly horoscope uses too many tokens relative to weekly")
     
     def _create_minimal_chart(self, name_suffix=""):
-        """Create a minimal astrological chart for testing."""
+        """Create a minimal cosmiclogical chart for testing."""
         planets = {
             "Sun": PlanetPosition(
                 name="Sun",
@@ -324,7 +335,7 @@ class TestHoroscopeEdgeCases(unittest.TestCase):
         moon_sign = SignData(name="Cancer", element="Water", modality="Cardinal", ruling_planet="Moon")
         ascendant = SignData(name="Leo", element="Fire", modality="Fixed", ruling_planet="Sun")
         
-        return AstrologicalChart(
+        return CosmiclogicalChart(
             planets=planets,
             houses=houses,
             sunSign=sun_sign,
@@ -361,7 +372,7 @@ class TestHoroscopeEdgeCases(unittest.TestCase):
         moon_sign = SignData(name="Cancer ♋", element="Water", modality="Cardinal", ruling_planet="Moon ☽")
         ascendant = SignData(name="Leo ♌", element="Fire", modality="Fixed", ruling_planet="Sun ☉")
         
-        return AstrologicalChart(
+        return CosmiclogicalChart(
             planets=planets,
             houses=houses,
             sunSign=sun_sign,

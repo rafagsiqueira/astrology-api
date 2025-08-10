@@ -1,4 +1,4 @@
-"""Astrology module for chart generation."""
+"""Cosmiclogy module for chart generation."""
 
 from datetime import datetime
 from typing import List
@@ -13,7 +13,7 @@ from timezonefinder import TimezoneFinder
 from config import get_logger
 from models import (
     BirthData, CurrentLocation, DailyTransit, HoroscopePeriod, PlanetPosition, HousePosition, 
-    AstrologicalChart, SignData, CompositeAnalysisRequest
+    CosmiclogicalChart, SignData, CompositeAnalysisRequest, DailyTransitChange, TransitChanges, RetrogradeChanges
 )
 
 logger = get_logger(__name__)
@@ -62,7 +62,7 @@ def get_ruler(sign: str) -> str:
     }
     return rulers.get(sign, 'Unknown')
 
-def create_astrological_subject(
+def create_cosmiclogical_subject(
     birth_data: BirthData,
     name: str = "User",
 ) -> AstrologicalSubject:
@@ -87,7 +87,7 @@ def create_astrological_subject(
     date = datetime.fromisoformat(f"{birth_data.birth_date} {birth_data.birth_time}")
     logger.debug(f"Creating AstrologicalSubject with timezone: {timezone}, local_date: {date}")
     
-    # Create astrological subject using local time components
+    # Create cosmiclogical subject using local time components
     return AstrologicalSubject(
         name=name,
         year=date.year,
@@ -110,8 +110,9 @@ def generate_transits(birth_data: BirthData, current_location: CurrentLocation, 
     Returns:
         TransitsTimeRangeModel object
     """
-    subject = create_astrological_subject(birth_data=birth_data)
+    subject = create_cosmiclogical_subject(birth_data=birth_data)
 
+    lookback = start_date - timedelta(days=1)
     end_date = start_date + timedelta(days=1)
     if period == HoroscopePeriod.week:
         end_date = start_date + timedelta(days=7)
@@ -124,10 +125,10 @@ def generate_transits(birth_data: BirthData, current_location: CurrentLocation, 
 
     aspects_and_retrograding_planets = []
     
-    ephemeris_factory = EphemerisDataFactory(start_datetime=start_date, end_datetime=end_date, lat=current_location.latitude, lng=current_location.longitude)
+    ephemeris_factory = EphemerisDataFactory(start_datetime=lookback, end_datetime=end_date, lat=current_location.latitude, lng=current_location.longitude)
     subjects = ephemeris_factory.get_ephemeris_data_as_astrological_subjects()
 
-    transits = TransitsTimeRangeFactory(natal_chart=subject, ephemeris_data_points=ephemeris_factory.get_ephemeris_data_as_astrological_subjects())
+    transits = TransitsTimeRangeFactory(natal_chart=subject, ephemeris_data_points=subjects)
     transit_moments = transits.get_transit_moments().transits
     aspects_and_retrograding_planets: list[DailyTransit] = []
     for idx, moment in enumerate(transit_moments):
@@ -140,8 +141,112 @@ def generate_transits(birth_data: BirthData, current_location: CurrentLocation, 
         aspects_and_retrograding_planets.append(DailyTransit(date=datetime.fromisoformat(moment.date), aspects=moment.aspects, retrograding=retrograding_planets))
     return aspects_and_retrograding_planets
 
-def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_svg: bool = True) -> AstrologicalChart:
-    """Convert an AstrologicalSubject to an AstrologicalChart."""
+def diff_transits(transits: list[DailyTransit]) -> list[DailyTransitChange]:
+    """
+    Iterates through daily transits and returns only the changes (begin/end events) 
+    for aspects and retrograde planets between consecutive days.
+    
+    Args:
+        transits: List of DailyTransit objects ordered by date
+        
+    Returns:
+        List of DailyTransitChange objects containing:
+        - date: "YYYY-MM-DD"
+        - aspects: TransitChanges with began/ended AspectModel lists
+        - retrogrades: RetrogradeChanges with began/ended planet name lists
+    """
+    if len(transits) <= 1:
+        # If we have 1 transit, return all as "began" events
+        if len(transits) == 1:
+            date_str = transits[0].date.strftime("%Y-%m-%d")
+            return [
+                DailyTransitChange(
+                    date=date_str,
+                    aspects=TransitChanges(
+                        began=transits[0].aspects,
+                        ended=[]
+                    ),
+                    retrogrades=RetrogradeChanges(
+                        began=transits[0].retrograding,
+                        ended=[]
+                    )
+                )
+            ]
+        return []
+    
+    diff_results = []
+    
+    for i in range(len(transits)):
+        current_day = transits[i]
+        date_str = current_day.date.strftime("%Y-%m-%d")
+        
+        if i == 0:
+            # For the first day, all aspects and retrogrades are "began" events
+            diff_results.append(DailyTransitChange(
+                date=date_str,
+                aspects=TransitChanges(
+                    began=current_day.aspects,
+                    ended=[]
+                ),
+                retrogrades=RetrogradeChanges(
+                    began=current_day.retrograding,
+                    ended=[]
+                )
+            ))
+            continue
+            
+        previous_day = transits[i - 1]
+        
+        # Convert aspects to comparable format (aspect type + planet pair)
+        def aspect_key(aspect):
+            # Create a unique key for each aspect based on planets and aspect type
+            planets = sorted([aspect.p1_name, aspect.p2_name])  # Sort to handle order consistency
+            return f"{planets[0]}_{planets[1]}_{aspect.aspect}"
+        
+        previous_aspects = {aspect_key(aspect): aspect for aspect in previous_day.aspects}
+        current_aspects = {aspect_key(aspect): aspect for aspect in current_day.aspects}
+        
+        previous_retrogrades = set(previous_day.retrograding)
+        current_retrogrades = set(current_day.retrograding)
+        
+        # Find aspect changes
+        # New aspects (began today)
+        began_aspects = []
+        for key, aspect in current_aspects.items():
+            if key not in previous_aspects:
+                began_aspects.append(aspect)
+        
+        # Ended aspects (were there yesterday, not today)
+        ended_aspects = []
+        for key, aspect in previous_aspects.items():
+            if key not in current_aspects:
+                ended_aspects.append(aspect)
+                
+        # Find retrograde changes
+        # New retrogrades (began today)
+        began_retrogrades = list(current_retrogrades - previous_retrogrades)
+        
+        # Ended retrogrades (were retrograde yesterday, not today)
+        ended_retrogrades = list(previous_retrogrades - current_retrogrades)
+        
+        # Only add to results if there are actual changes
+        if began_aspects or ended_aspects or began_retrogrades or ended_retrogrades:
+            diff_results.append(DailyTransitChange(
+                date=date_str,
+                aspects=TransitChanges(
+                    began=began_aspects,
+                    ended=ended_aspects
+                ),
+                retrogrades=RetrogradeChanges(
+                    began=began_retrogrades,
+                    ended=ended_retrogrades
+                )
+            ))
+    
+    return diff_results
+
+def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_svg: bool = True) -> CosmiclogicalChart:
+    """Convert an AstrologicalSubject to an CosmiclogicalChart."""
     try:
         # Process planets data
         planets_dict = {}
@@ -235,7 +340,7 @@ def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_
                 except Exception as storage_error:
                     logger.error(f"Error uploading chart to storage: {storage_error}")
         
-        return AstrologicalChart(
+        return CosmiclogicalChart(
             planets=planets_dict,
             houses=houses_dict,
             sunSign=sun_sign,
@@ -249,12 +354,12 @@ def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_
         logger.error(f"Failed to convert subject to chart: {e}")
         raise
 
-def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> AstrologicalChart:
-    """Generate a complete astrological chart from birth data."""
+def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> CosmiclogicalChart:
+    """Generate a complete cosmiclogical chart from birth data."""
     try:
         logger.debug(f"Generating birth chart for coordinates {birth_data.latitude}, {birth_data.longitude}")
         
-        user_subject = create_astrological_subject(
+        user_subject = create_cosmiclogical_subject(
             birth_data=birth_data,
             name="User"
         )
@@ -265,18 +370,18 @@ def generate_birth_chart(birth_data: BirthData, with_svg: bool = True) -> Astrol
         logger.error(f"Failed to generate birth chart: {e}")
         raise
 
-def generate_composite_chart(request: CompositeAnalysisRequest, with_svg: bool = True) -> AstrologicalChart:
+def generate_composite_chart(request: CompositeAnalysisRequest, with_svg: bool = True) -> CosmiclogicalChart:
     """Generate a composite chart from two people's birth data using midpoint method."""
     try:
         logger.debug(f"Generating composite chart between two subjects")
         
         # Create AstrologicalSubjects for both people
-        person1_subject = create_astrological_subject(
+        person1_subject = create_cosmiclogical_subject(
             birth_data=request.person1_birth_data,
             name="Person1"
         )
         
-        person2_subject = create_astrological_subject(
+        person2_subject = create_cosmiclogical_subject(
             birth_data=request.person2_birth_data,
             name="Person2"
         )
@@ -285,7 +390,7 @@ def generate_composite_chart(request: CompositeAnalysisRequest, with_svg: bool =
         composite_factory = CompositeSubjectFactory(person1_subject, person2_subject)
         composite_subject = composite_factory.get_midpoint_composite_subject_model()
         
-        # Convert to AstrologicalChart
+        # Convert to CosmiclogicalChart
         composite_chart = subject_to_chart(subject=composite_subject, with_svg=with_svg)
         
         logger.debug("Composite chart generated successfully")

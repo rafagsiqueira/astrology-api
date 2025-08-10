@@ -93,10 +93,9 @@ class CloudStorageService:
             logger.error("Cloud Storage not initialized")
             return False
             
+        birth_hash = self._hash_birth_data(birth_data)
+        filename = self._generate_chart_filename(birth_hash)
         try:
-            birth_hash = self._hash_birth_data(birth_data)
-            filename = self._generate_chart_filename(birth_hash)
-            
             blob = self.bucket.blob(filename)
             blob.delete()
             
@@ -156,7 +155,7 @@ class CloudStorageService:
             
         try:
             birth_hash = self._hash_birth_data(birth_data)
-            filename = self._generate_chart_filename(user_id, birth_hash)
+            filename = self._generate_chart_filename(birth_hash)
             
             blob = self.bucket.blob(filename)
             if blob.exists():
@@ -180,13 +179,3 @@ cloud_storage_service = CloudStorageService()
 def upload_chart_to_storage(svg_content: str) -> Optional[str]:
     """Convenience function to upload chart SVG."""
     return cloud_storage_service.upload_chart_svg(svg_content)
-
-
-def get_chart_from_storage(user_id: str, birth_data: dict) -> Optional[str]:
-    """Convenience function to get chart URL."""
-    return cloud_storage_service.get_chart_url(user_id, birth_data)
-
-
-def delete_chart_from_storage(user_id: str, birth_data: dict) -> bool:
-    """Convenience function to delete chart SVG."""
-    return cloud_storage_service.delete_chart_svg(user_id, birth_data)

@@ -1,6 +1,6 @@
 # Claude API Integration
 
-The Cosmic Guru backend integrates with Claude AI for personality analysis based on astrological charts.
+The Cosmic Guru backend integrates with Claude AI for personality analysis based on cosmiclogical charts.
 
 ## Setup
 
@@ -41,13 +41,13 @@ curl -X POST "http://localhost:8000/api/analyze-personality" \
 ## API Endpoints
 
 ### POST /api/analyze-personality
-Analyzes personality based on astrological chart data.
+Analyzes personality based on cosmiclogical chart data.
 
 **Request Body:**
 ```json
 {
   "chart": {
-    // AstrologicalChart object from /api/generate-chart
+    // CosmiclogicalChart object from /api/generate-chart
   },
   "analysisType": "comprehensive", // "comprehensive" | "quick" | "specific"
   "focusAreas": ["personality", "career", "relationships"] // optional

@@ -66,8 +66,8 @@ class ChartAnalysis(BaseModel):
     neptune: PlanetAnalysis
     pluto: PlanetAnalysis
 
-class AstrologicalChart(BaseModel):
-    """Complete astrological chart data."""
+class CosmiclogicalChart(BaseModel):
+    """Complete cosmiclogical chart data."""
     planets: Dict[str, PlanetPosition]
     houses: Dict[str, HousePosition]
     sunSign: SignData
@@ -84,7 +84,7 @@ class AstrologicalChart(BaseModel):
         houses_str = ", ".join([f"House {house.house}: {house.degree:.1f}° {house.sign}" 
                                for name, house in self.houses.items()])
         
-        return f"""Astrological Chart:
+        return f"""Cosmiclogical Chart:
 Sun Sign: {self.sunSign.name} ({self.sunSign.element}, {self.sunSign.modality})
 Moon Sign: {self.moonSign.name} ({self.moonSign.element}, {self.moonSign.modality})
 Ascendant: {self.ascendant.name} ({self.ascendant.element}, {self.ascendant.modality})
@@ -137,7 +137,7 @@ class LifePathSection(BaseModel):
     key_development_areas: List[str]
 
 class PersonalityAnalysis(BaseModel):
-    """Complete personality analysis based on astrological chart."""
+    """Complete personality analysis based on cosmiclogical chart."""
     overview: str
     personality_traits: PersonalityTraitsSection
     emotional_nature: EmotionalNatureSection
@@ -182,13 +182,13 @@ class ChatRole(Enum):
     SYSTEM = 'system'
 
 class ChatMessage(BaseModel):
-    """Chat message for astrological consultation."""
+    """Chat message for cosmiclogical consultation."""
     role: ChatRole
     content: str
     timestamp: datetime
 
 class ChatResponse(BaseModel):
-    """Response from the astrological chat API."""
+    """Response from the cosmiclogical chat API."""
     response: str
     timestamp: datetime
 
@@ -202,7 +202,7 @@ class UserProfile(BaseModel):
     longitude: float
     created_at: datetime
     updated_at: datetime
-    astrological_chart: Optional[AstrologicalChart] = None
+    cosmiclogical_chart: Optional[CosmiclogicalChart] = None
     personality_analysis: Optional[PersonalityAnalysis] = None
     partners: Optional[List["PartnerData"]] = []
 
@@ -215,7 +215,7 @@ class PartnerData(BaseModel):
     latitude: float
     longitude: float
     created_at: datetime
-    astrological_chart: Optional[AstrologicalChart] = None
+    cosmiclogical_chart: Optional[CosmiclogicalChart] = None
 
 class AddPartnerRequest(BaseModel):
     """Request to add a partner to user profile."""
@@ -227,7 +227,7 @@ class AddPartnerRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    """Request for chat with astrologer."""
+    """Request for chat with cosmicloger."""
     message: str
 
 class RelationshipAnalysisRequest(BaseModel):
@@ -302,9 +302,26 @@ class DailyTransit(BaseModel):
     aspects: list[AspectModel]
     retrograding: list[str]
 
+class TransitChanges(BaseModel):
+    """Changes in aspects and retrogrades for a specific day."""
+    began: list[AspectModel]
+    ended: list[AspectModel]
+
+class RetrogradeChanges(BaseModel):
+    """Changes in retrograde planets for a specific day."""
+    began: list[str]
+    ended: list[str]
+
+class DailyTransitChange(BaseModel):
+    """Transit changes for a specific day."""
+    date: str  # YYYY-MM-DD format
+    aspects: TransitChanges
+    retrogrades: RetrogradeChanges
+
 class DailyTransitResponse(BaseModel):
     """Daily transit data response."""
     transits: list[DailyTransit]
+    changes: list[DailyTransitChange]
 
 class DailyHoroscopeRequest(BaseModel):
     """Request for daily horoscope analysis."""
@@ -318,3 +335,13 @@ class DailyHoroscopeResponse(BaseModel):
     key_themes: List[str]
     energy_level: str  # low, moderate, high, intense
     focus_areas: List[str]
+
+class GenerateHoroscopeRequest(BaseModel):
+    """Request for generating horoscope from transit changes."""
+    birth_data: BirthData
+    transit_changes: DailyTransitChange
+
+class GenerateHoroscopeResponse(BaseModel):
+    """Response for generated horoscope."""
+    horoscope_text: str
+    target_date: str

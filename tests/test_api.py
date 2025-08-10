@@ -69,6 +69,7 @@ class TestAPIEndpoints:
                         mock_response = Mock()
                         mock_response.content = [mock_text_block]
                         mock_response.usage = mock_usage
+                        mock_response.stop_reason = 'end_turn'
                         
                         mock_claude = Mock()
                         mock_claude.messages.create.return_value = mock_response
@@ -127,6 +128,7 @@ class TestAPIEndpoints:
                         mock_response = Mock()
                         mock_response.content = [mock_text_block]
                         mock_response.usage = mock_usage
+                        mock_response.stop_reason = 'end_turn'
                         
                         mock_claude = Mock()
                         mock_claude.messages.create.return_value = mock_response
@@ -215,6 +217,7 @@ class TestAPIEndpoints:
                 mock_response = Mock()
                 mock_response.content = [mock_text_block]
                 mock_response.usage = mock_usage
+                mock_response.stop_reason = 'end_turn'
                 
                 mock_claude = Mock()
                 mock_claude.messages.create.return_value = mock_response
@@ -260,6 +263,7 @@ class TestAPIEndpoints:
                     mock_response = Mock()
                     mock_response.content = [mock_text_block]
                     mock_response.usage = mock_usage
+                    mock_response.stop_reason = 'end_turn'
                     
                     mock_claude = Mock()
                     mock_claude.messages.create.return_value = mock_response
@@ -346,7 +350,7 @@ class TestAPIEndpoints:
         with patch('routes.build_relationship_context') as mock_build_context:
             with patch('routes.get_claude_client') as mock_get_claude:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
-                    with patch('routes.create_astrological_subject') as mock_create_subject:
+                    with patch('routes.create_cosmiclogical_subject') as mock_create_subject:
                         with patch('routes.RelationshipScoreFactory') as mock_score_factory:
                             with patch('routes.generate_birth_chart') as mock_generate_chart:
                                 # Setup mocks
@@ -374,7 +378,7 @@ class TestAPIEndpoints:
                                 # Mock parsed response
                                 mock_parse_response.return_value = RelationshipAnalysis(
                                     score=85,
-                                    overview="This is a powerful astrological connection with strong karmic ties.",
+                                    overview="This is a powerful cosmiclogical connection with strong karmic ties.",
                                     compatibility_level="Very High",
                                     destiny_signs="Strong karmic connections present",
                                     relationship_aspects=["Sun conjunction Moon", "Venus trine Mars"],
@@ -388,7 +392,7 @@ class TestAPIEndpoints:
                                 
                                 # Verify the result
                                 assert result.score == 85
-                                assert result.overview == "This is a powerful astrological connection with strong karmic ties."
+                                assert result.overview == "This is a powerful cosmiclogical connection with strong karmic ties."
                                 assert result.compatibility_level == "Very High"
                                 assert result.destiny_signs == "Strong karmic connections present"
                                 assert result.relationship_aspects == ["Sun conjunction Moon", "Venus trine Mars"]
@@ -479,7 +483,7 @@ class TestAPIEndpoints:
                         overview="Analysis temporarily unavailable.",
                         compatibility_level="Moderate",
                         destiny_signs="No significant karmic connections detected",
-                        relationship_aspects=["Basic astrological compatibility"],
+                        relationship_aspects=["Basic cosmiclogical compatibility"],
                         strengths=["Basic compatibility analysis"],
                         challenges=["Communication may require effort"],
                         areas_for_growth=["Focus on understanding each other's perspectives"]
@@ -553,7 +557,7 @@ class TestAPIEndpoints:
         with patch('routes.build_relationship_context') as mock_build_context:
             with patch('routes.get_claude_client') as mock_get_claude:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
-                    with patch('routes.create_astrological_subject') as mock_create_subject:
+                    with patch('routes.create_cosmiclogical_subject') as mock_create_subject:
                         with patch('routes.RelationshipScoreFactory') as mock_score_factory:
                             with patch('routes.generate_birth_chart') as mock_generate_chart:
                                 # Setup mocks for low compatibility

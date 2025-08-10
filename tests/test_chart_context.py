@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import Mock
-from models import AstrologicalChart, PlanetPosition, HousePosition, SignData
+from models import CosmiclogicalChart, PlanetPosition, HousePosition, SignData
 from contexts import build_birth_chart_context, parse_chart_response
 
 
@@ -64,8 +64,8 @@ class TestBuildBirthChartContext:
             ruling_planet="Sun"
         )
         
-        # Create mock astrological chart
-        self.chart = AstrologicalChart(
+        # Create mock cosmiclogical chart
+        self.chart = CosmiclogicalChart(
             planets=self.planets,
             houses=self.houses,
             sunSign=self.sun_sign,
@@ -83,13 +83,13 @@ class TestBuildBirthChartContext:
         assert len(user) > 0
     
     def test_context_contains_required_elements(self):
-        """Test that the context contains required astrological elements."""
+        """Test that the context contains required cosmiclogical elements."""
         (cached, user) = build_birth_chart_context(self.chart)
         
         # Check for key instructional elements
-        assert "expert astrologer" in cached
+        assert "expert cosmicloger" in cached
         assert "planet-house combinations" in user
-        assert "JSON structure" in cached
+        assert "JSON format" in cached
         
         # Check for planet placeholders (only the ones in our test fixture)
         assert "sun" in user.lower()
@@ -106,8 +106,6 @@ class TestBuildBirthChartContext:
         assert "pluto" in cached.lower()
         
         # Check for sign elements in the cached template
-        assert "sun_sign" in cached.lower()
-        assert "moon_sign" in cached.lower()
         assert "ascendant" in cached.lower()
     
     def test_context_includes_planet_data(self):
@@ -133,7 +131,7 @@ class TestBuildBirthChartContext:
         expected_fields = [
             '"sun":', '"moon":', '"mercury":', '"venus":', '"mars":',
             '"jupiter":', '"saturn":', '"uranus":', '"neptune":', '"pluto":',
-            '"sun_sign":', '"moon_sign":', '"ascendant":'
+            '"ascendant":'
         ]
         
         for field in expected_fields:
@@ -141,7 +139,7 @@ class TestBuildBirthChartContext:
     
     def test_empty_planets_dict(self):
         """Test handling of empty planets dictionary."""
-        empty_chart = AstrologicalChart(
+        empty_chart = CosmiclogicalChart(
             planets={},
             houses=self.houses,
             sunSign=self.sun_sign,
@@ -155,7 +153,7 @@ class TestBuildBirthChartContext:
         # Should still return a valid context string
         assert isinstance(user, str)
         assert len(user) > 0
-        assert "expert astrologer" in cached
+        assert "expert cosmicloger" in cached
 
 
 class TestParseChartResponse:

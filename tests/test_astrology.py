@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from models import BirthData   
 
-class TestAstrologyHelpers:
+class TestCosmiclogyHelpers:
     def test_element_mapping(self):
         """Test that elements are correctly mapped"""
         from astrology import get_element
@@ -183,7 +183,7 @@ class TestChartGeneration:
         assert '-74.0060' not in svg_content
     
     def test_chart_sign_validation(self):
-        """Test that chart generates valid astrological signs"""
+        """Test that chart generates valid cosmiclogical signs"""
         from astrology import generate_birth_chart
         
         birth_data = BirthData(

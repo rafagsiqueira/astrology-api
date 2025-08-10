@@ -4,10 +4,10 @@ import unittest
 from unittest.mock import MagicMock, patch
 import json
 from datetime import datetime, date
-from models import BirthData, CurrentLocation, HoroscopePeriod, AstrologicalChart, PlanetPosition, HousePosition, SignData
+from models import BirthData, CurrentLocation, HoroscopePeriod, CosmiclogicalChart, PlanetPosition, HousePosition, SignData
 from contexts import build_horoscope_context
 from kerykeion.kr_types.kr_models import TransitsTimeRangeModel
-import tiktoken
+from config import get_claude_client
 
 
 class MockTransitMoment:
@@ -69,11 +69,11 @@ class TestBuildHoroscopeContext(unittest.TestCase):
         # Create mock charts with some retrograde planets
         self.mock_charts = self._create_mock_charts()
         
-        # Initialize token encoder for Claude (gpt-4 tokenizer as approximation)
-        self.encoder = tiktoken.encoding_for_model("gpt-4")
+        # Initialize Claude client for token counting
+        self.claude_client = get_claude_client()
     
     def _create_mock_charts(self):
-        """Create mock astrological charts."""
+        """Create mock cosmiclogical charts."""
         charts = []
         
         for i in range(3):
@@ -113,7 +113,7 @@ class TestBuildHoroscopeContext(unittest.TestCase):
             moon_sign = SignData(name="Cancer", element="Water", modality="Cardinal", ruling_planet="Moon")
             ascendant = SignData(name="Aries", element="Fire", modality="Cardinal", ruling_planet="Mars")
             
-            chart = AstrologicalChart(
+            chart = CosmiclogicalChart(
                 planets=planets,
                 houses=houses,
                 sunSign=sun_sign,
@@ -127,8 +127,19 @@ class TestBuildHoroscopeContext(unittest.TestCase):
         return charts
     
     def count_tokens(self, text):
-        """Count tokens in text using tiktoken."""
-        return len(self.encoder.encode(text))
+        """Count tokens in text using Claude's token counting."""
+        try:
+            response = self.claude_client.messages.count_tokens(
+                model="claude-3-5-sonnet-20241022",
+                messages=[{
+                    "role": "user", 
+                    "content": text
+                }]
+            )
+            return response.input_tokens
+        except Exception as e:
+            # Fallback: rough approximation (4 chars per token)
+            return len(text) // 4
     
     def test_build_horoscope_context_week(self):
         """Test building horoscope context for weekly horoscope."""
@@ -288,7 +299,7 @@ class TestBuildHoroscopeContext(unittest.TestCase):
         
         # Check structural elements
         structure_checks = {
-            "Contains astrologer role": "astrology guru" in system,
+            "Contains cosmicloger role": "astrology guru" in system,
             "Contains formatting section": "<formatting>" in system,
             "Contains JSON structure": '"overvall_summary"' in system,
             "Contains specific_findings": '"specific_findings"' in system,

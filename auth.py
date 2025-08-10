@@ -118,17 +118,15 @@ def get_firebase_app():
     """Get the Firebase app instance."""
     return firebase_app
 
-def validate_database_availability(db) -> None:
+def validate_database_availability() -> None:
     """Validate that database is available.
-    
-    Args:
-        db: Firestore database client
         
     Raises:
         HTTPException: If database is not available
     """
-    if not db:
+    client = get_firestore_client()
+    if not client:
         raise HTTPException(
-            status_code=500, 
-            detail="Database not available"
+            status_code=503, 
+            detail="Firestore service unavailable"
         )

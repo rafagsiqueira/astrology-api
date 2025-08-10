@@ -1,6 +1,6 @@
 # Cosmic Guru Python Backend
 
-This is the Python backend API for the Cosmic Guru Flutter app, providing astrological chart generation using the kerykeion library.
+This is the Python backend API for the Cosmic Guru Flutter app, providing cosmiclogical chart generation using the kerykeion library.
 
 ## Setup
 
@@ -28,7 +28,7 @@ The API will be available at `http://localhost:8000`
 Health check endpoint
 
 ### POST /api/generate-chart
-Generate an astrological birth chart from birth data
+Generate an cosmiclogical birth chart from birth data
 
 **Request Body:**
 ```json
@@ -44,11 +44,11 @@ Generate an astrological birth chart from birth data
 ```
 
 **Response:**
-Returns a complete astrological chart with planetary positions, houses, aspects, and sign data.
+Returns a complete cosmiclogical chart with planetary positions, houses, aspects, and sign data.
 
 ## Features
 
-- Uses kerykeion for accurate astrological calculations
+- Uses kerykeion for accurate cosmiclogical calculations
 - FastAPI for high-performance API
 - CORS enabled for Flutter app integration
 - Comprehensive birth chart data extraction
