@@ -250,7 +250,7 @@ class TestAPIEndpoints:
             with patch('routes.build_personality_context') as mock_build_context:
                 with patch('routes.parse_personality_response') as mock_parse_response:
                     # Setup mocks
-                    mock_build_context.return_value = "Mocked context"
+                    mock_build_context.return_value = ("Mocked system", "Mocked user message")
                     
                     # Mock Claude client response
                     from anthropic.types import TextBlock
@@ -354,7 +354,7 @@ class TestAPIEndpoints:
                         with patch('routes.RelationshipScoreFactory') as mock_score_factory:
                             with patch('routes.generate_birth_chart') as mock_generate_chart:
                                 # Setup mocks
-                                mock_build_context.return_value = "Mocked relationship analysis context"
+                                mock_build_context.return_value = ("Mocked system", "Mocked user message")
                                 mock_create_subject.return_value = Mock()
                                 mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=85, score_description="High", is_destiny_sign=True, aspects=[])
                                 mock_chart = Mock()
@@ -373,6 +373,7 @@ class TestAPIEndpoints:
                                 mock_claude_response = Mock()
                                 mock_claude_response.content = [mock_text_block]
                                 mock_claude_response.usage = mock_usage
+                                mock_claude_response.stop_reason = 'end_turn'
                                 mock_get_claude.return_value.messages.create.return_value = mock_claude_response
                                 
                                 # Mock parsed response
@@ -432,7 +433,7 @@ class TestAPIEndpoints:
             with patch('routes.get_claude_client') as mock_get_claude:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
                     # Setup mocks for new backend structure
-                    mock_build_context.return_value = "Mocked relationship context"
+                    mock_build_context.return_value = ("Mocked system", "Mocked user message")
                     mock_get_claude.return_value = None  # Simulate Claude client unavailable
                     
                     # Mock parse response to raise an exception
@@ -474,7 +475,7 @@ class TestAPIEndpoints:
             with patch('routes.get_claude_client') as mock_get_claude:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
                     # Setup mocks for API unavailable scenario
-                    mock_build_context.return_value = "Mocked relationship context"
+                    mock_build_context.return_value = ("Mocked system", "Mocked user message")
                     mock_get_claude.return_value = None  # Simulate API unavailable
                     
                     # Mock parse response to return fallback response (API unavailable)
@@ -561,7 +562,7 @@ class TestAPIEndpoints:
                         with patch('routes.RelationshipScoreFactory') as mock_score_factory:
                             with patch('routes.generate_birth_chart') as mock_generate_chart:
                                 # Setup mocks for low compatibility
-                                mock_build_context.return_value = "Mocked relationship context"
+                                mock_build_context.return_value = ("Mocked system", "Mocked user message")
                                 mock_create_subject.return_value = Mock()
                                 mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=35, score_description="Low", is_destiny_sign=False, aspects=[])
                                 mock_chart = Mock()
@@ -580,6 +581,7 @@ class TestAPIEndpoints:
                                 mock_claude_response = Mock()
                                 mock_claude_response.content = [mock_text_block]
                                 mock_claude_response.usage = mock_usage
+                                mock_claude_response.stop_reason = 'end_turn'
                                 mock_get_claude.return_value.messages.create.return_value = mock_claude_response
                                 
                                 # Mock parsed response for low compatibility
@@ -607,3 +609,412 @@ class TestAPIEndpoints:
                                 assert result.strengths == ["Opportunity for growth", "Learning from differences"]
                                 assert result.challenges == ["Different life approaches", "Communication barriers"]
                                 assert result.areas_for_growth == ["Focus on building understanding through patient communication"]
+    
+    def test_get_daily_transits_success(self):
+        """Test successful daily transits request"""
+        from routes import get_daily_transits
+        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
+        from unittest.mock import patch, Mock
+        import asyncio
+        
+        # Create test data
+        birth_data = BirthData(
+            birth_date="1990-01-01",
+            birth_time="12:00",
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        current_location = CurrentLocation(
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        request = DailyTransitRequest(
+            birth_data=birth_data,
+            current_location=current_location,
+            target_date="2024-01-01T00:00:00",
+            period=HoroscopePeriod.day
+        )
+        auth_user = {'uid': 'test-user-123'}
+        
+        # Mock the dependencies
+        with patch('routes.generate_transits') as mock_generate:
+            with patch('routes.diff_transits') as mock_diff:
+                from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
+                from datetime import datetime
+                
+                # Setup mocks with real model objects
+                mock_daily_transit = DailyTransit(
+                    date=datetime(2024, 1, 1),
+                    aspects=[],
+                    retrograding=["Mercury"]
+                )
+                
+                mock_transit_change = DailyTransitChange(
+                    date="2024-01-01",
+                    aspects=TransitChanges(began=[], ended=[]),
+                    retrogrades=RetrogradeChanges(began=["Mercury"], ended=[])
+                )
+                
+                mock_generate.return_value = [mock_daily_transit]
+                mock_diff.return_value = [mock_transit_change]
+                
+                # Test the endpoint
+                result = asyncio.run(get_daily_transits(request, auth_user))
+                
+                # Verify the result
+                assert result.transits == [mock_daily_transit]
+                assert result.changes == [mock_transit_change]
+                mock_generate.assert_called_once()
+                mock_diff.assert_called_once_with([mock_daily_transit])
+    
+    def test_get_daily_transits_invalid_date(self):
+        """Test daily transits with invalid date format"""
+        from routes import get_daily_transits
+        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
+        from unittest.mock import patch
+        import asyncio
+        
+        # Create test data with invalid date
+        birth_data = BirthData(
+            birth_date="1990-01-01",
+            birth_time="12:00",
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        current_location = CurrentLocation(
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        request = DailyTransitRequest(
+            birth_data=birth_data,
+            current_location=current_location,
+            target_date="invalid-date-format",
+            period=HoroscopePeriod.day
+        )
+        auth_user = {'uid': 'test-user-123'}
+        
+        # Test should raise HTTPException due to invalid date
+        with pytest.raises(Exception):  # Should raise HTTPException
+            asyncio.run(get_daily_transits(request, auth_user))
+    
+    def test_get_daily_transits_generate_error(self):
+        """Test daily transits when generate_transits raises error"""
+        from routes import get_daily_transits
+        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
+        from unittest.mock import patch
+        import asyncio
+        
+        # Create test data
+        birth_data = BirthData(
+            birth_date="1990-01-01",
+            birth_time="12:00",
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        current_location = CurrentLocation(
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        request = DailyTransitRequest(
+            birth_data=birth_data,
+            current_location=current_location,
+            target_date="2024-01-01T00:00:00",
+            period=HoroscopePeriod.day
+        )
+        auth_user = {'uid': 'test-user-123'}
+        
+        # Mock generate_transits to raise an error
+        with patch('routes.generate_transits', side_effect=ValueError("Transit calculation failed")):
+            # Test should raise HTTPException
+            with pytest.raises(Exception):
+                asyncio.run(get_daily_transits(request, auth_user))
+    
+    def test_get_daily_transits_diff_error(self):
+        """Test daily transits when diff_transits raises error"""
+        from routes import get_daily_transits
+        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
+        from unittest.mock import patch, Mock
+        import asyncio
+        
+        # Create test data
+        birth_data = BirthData(
+            birth_date="1990-01-01",
+            birth_time="12:00",
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        current_location = CurrentLocation(
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        request = DailyTransitRequest(
+            birth_data=birth_data,
+            current_location=current_location,
+            target_date="2024-01-01T00:00:00",
+            period=HoroscopePeriod.day
+        )
+        auth_user = {'uid': 'test-user-123'}
+        
+        # Mock the dependencies
+        with patch('routes.generate_transits') as mock_generate:
+            with patch('routes.diff_transits', side_effect=ValueError("Diff calculation failed")):
+                from models import DailyTransit
+                from datetime import datetime
+                
+                mock_generate.return_value = [DailyTransit(
+                    date=datetime(2024, 1, 1),
+                    aspects=[],
+                    retrograding=[]
+                )]
+                
+                # Test should raise HTTPException
+                with pytest.raises(Exception):
+                    asyncio.run(get_daily_transits(request, auth_user))
+    
+    def test_get_daily_transits_weekly_period(self):
+        """Test daily transits with weekly period"""
+        from routes import get_daily_transits
+        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
+        from unittest.mock import patch, Mock
+        import asyncio
+        
+        # Create test data with weekly period
+        birth_data = BirthData(
+            birth_date="1990-01-01",
+            birth_time="12:00",
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        current_location = CurrentLocation(
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        request = DailyTransitRequest(
+            birth_data=birth_data,
+            current_location=current_location,
+            target_date="2024-01-01T00:00:00",
+            period=HoroscopePeriod.week
+        )
+        auth_user = {'uid': 'test-user-123'}
+        
+        # Mock the dependencies
+        with patch('routes.generate_transits') as mock_generate:
+            with patch('routes.diff_transits') as mock_diff:
+                from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
+                from datetime import datetime
+                
+                # Setup mocks for multiple days
+                mock_transits = []
+                mock_changes = []
+                for i in range(7):
+                    mock_transit = DailyTransit(
+                        date=datetime(2024, 1, i+1),
+                        aspects=[],
+                        retrograding=[]
+                    )
+                    mock_transits.append(mock_transit)
+                    
+                    mock_change = DailyTransitChange(
+                        date=f"2024-01-0{i+1}",
+                        aspects=TransitChanges(began=[], ended=[]),
+                        retrogrades=RetrogradeChanges(began=[], ended=[])
+                    )
+                    mock_changes.append(mock_change)
+                
+                mock_generate.return_value = mock_transits
+                mock_diff.return_value = mock_changes
+                
+                # Test the endpoint
+                result = asyncio.run(get_daily_transits(request, auth_user))
+                
+                # Verify the result
+                assert len(result.transits) == 7
+                assert len(result.changes) == 7
+                mock_generate.assert_called_once_with(
+                    birth_data=birth_data,
+                    current_location=current_location,
+                    start_date=mock_generate.call_args[1]['start_date'],
+                    period=HoroscopePeriod.week
+                )
+    
+    def test_get_daily_transits_monthly_period(self):
+        """Test daily transits with monthly period"""
+        from routes import get_daily_transits
+        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
+        from unittest.mock import patch, Mock
+        import asyncio
+        
+        # Create test data with monthly period
+        birth_data = BirthData(
+            birth_date="1990-01-01",
+            birth_time="12:00",
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        current_location = CurrentLocation(
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        request = DailyTransitRequest(
+            birth_data=birth_data,
+            current_location=current_location,
+            target_date="2024-01-01T00:00:00",
+            period=HoroscopePeriod.month
+        )
+        auth_user = {'uid': 'test-user-123'}
+        
+        # Mock the dependencies
+        with patch('routes.generate_transits') as mock_generate:
+            with patch('routes.diff_transits') as mock_diff:
+                from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
+                from datetime import datetime
+                
+                # Setup mocks for monthly data (approximate 30 days)
+                mock_transits = [DailyTransit(
+                    date=datetime(2024, 1, i+1),
+                    aspects=[],
+                    retrograding=[]
+                ) for i in range(30)]
+                mock_changes = [DailyTransitChange(
+                    date=f"2024-01-{i+1:02d}",
+                    aspects=TransitChanges(began=[], ended=[]),
+                    retrogrades=RetrogradeChanges(began=[], ended=[])
+                ) for i in range(30)]
+                
+                mock_generate.return_value = mock_transits
+                mock_diff.return_value = mock_changes
+                
+                # Test the endpoint
+                result = asyncio.run(get_daily_transits(request, auth_user))
+                
+                # Verify the result
+                assert len(result.transits) == 30
+                assert len(result.changes) == 30
+                mock_generate.assert_called_once_with(
+                    birth_data=birth_data,
+                    current_location=current_location,
+                    start_date=mock_generate.call_args[1]['start_date'],
+                    period=HoroscopePeriod.month
+                )
+    
+    def test_get_daily_transits_unauthenticated_user(self):
+        """Test daily transits endpoint with unauthenticated user"""
+        from routes import get_daily_transits
+        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
+        from unittest.mock import patch
+        import asyncio
+        
+        # Create test data
+        birth_data = BirthData(
+            birth_date="1990-01-01",
+            birth_time="12:00",
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        current_location = CurrentLocation(
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        request = DailyTransitRequest(
+            birth_data=birth_data,
+            current_location=current_location,
+            target_date="2024-01-01T00:00:00",
+            period=HoroscopePeriod.day
+        )
+        
+        # Test with None user (unauthenticated) should raise an error
+        with pytest.raises(Exception):  # Should raise error due to user['uid'] access
+            asyncio.run(get_daily_transits(request, None))
+    
+    def test_get_daily_transits_valid_authenticated_user(self):
+        """Test daily transits endpoint with valid authenticated user"""
+        from routes import get_daily_transits
+        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
+        from unittest.mock import patch, Mock
+        import asyncio
+        
+        # Create test data
+        birth_data = BirthData(
+            birth_date="1990-01-01",
+            birth_time="12:00",
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        current_location = CurrentLocation(
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        request = DailyTransitRequest(
+            birth_data=birth_data,
+            current_location=current_location,
+            target_date="2024-01-01T00:00:00",
+            period=HoroscopePeriod.day
+        )
+        
+        # Valid authenticated user
+        auth_user = {
+            'uid': 'test-user-123',
+            'email': 'test@example.com',
+            'name': 'Test User'
+        }
+        
+        with patch('routes.generate_transits') as mock_generate:
+            with patch('routes.diff_transits') as mock_diff:
+                from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
+                from datetime import datetime
+                
+                mock_transit = DailyTransit(
+                    date=datetime(2024, 1, 1),
+                    aspects=[],
+                    retrograding=[]
+                )
+                mock_change = DailyTransitChange(
+                    date="2024-01-01",
+                    aspects=TransitChanges(began=[], ended=[]),
+                    retrogrades=RetrogradeChanges(began=[], ended=[])
+                )
+                mock_generate.return_value = [mock_transit]
+                mock_diff.return_value = [mock_change]
+                
+                # Test with valid authenticated user
+                result = asyncio.run(get_daily_transits(request, auth_user))
+                
+                assert result.transits == [mock_transit]
+                assert result.changes == [mock_change]
+                mock_generate.assert_called_once()
+    
+    def test_get_daily_transits_missing_user_fields(self):
+        """Test daily transits endpoint with user missing required fields"""
+        from routes import get_daily_transits
+        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
+        from unittest.mock import patch, Mock
+        import asyncio
+        
+        # Create test data
+        birth_data = BirthData(
+            birth_date="1990-01-01",
+            birth_time="12:00",
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        current_location = CurrentLocation(
+            latitude=40.7128,
+            longitude=-74.0060
+        )
+        request = DailyTransitRequest(
+            birth_data=birth_data,
+            current_location=current_location,
+            target_date="2024-01-01T00:00:00",
+            period=HoroscopePeriod.day
+        )
+        
+        # User missing 'uid' field
+        invalid_user = {
+            'email': 'test@example.com',
+            'name': 'Test User'
+            # Missing 'uid' field
+        }
+        
+        # Test should raise error because user is missing 'uid' field
+        with pytest.raises(Exception):  # Should raise KeyError for missing 'uid'
+            asyncio.run(get_daily_transits(request, invalid_user))

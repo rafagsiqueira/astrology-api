@@ -79,8 +79,59 @@ class TestBirthChartContext(unittest.TestCase):
     
     def test_parse_chart_response_valid_json(self):
         """Test parsing valid chart analysis response."""
-        # Skip this test for now due to JSON format complexity
-        self.skipTest("JSON format test temporarily disabled")
+        valid_json_response = '''"sun": {
+            "influence": "Strong leadership and creativity",
+            "traits": ["confident", "creative", "generous"]
+        },
+        "moon": {
+            "influence": "Deep emotional nature and intuition",
+            "traits": ["intuitive", "nurturing", "sensitive"]
+        },
+        "ascendant": {
+            "influence": "Intense and transformative presence",
+            "traits": ["magnetic", "determined", "perceptive"]
+        },
+        "mercury": {
+            "influence": "Quick thinking and communication skills",
+            "traits": ["articulate", "curious", "adaptable"]
+        },
+        "venus": {
+            "influence": "Artistic and romantic nature",
+            "traits": ["charming", "aesthetic", "harmonious"]
+        },
+        "mars": {
+            "influence": "Dynamic energy and assertiveness",
+            "traits": ["energetic", "passionate", "decisive"]
+        },
+        "jupiter": {
+            "influence": "Optimism and expansion",
+            "traits": ["optimistic", "philosophical", "generous"]
+        },
+        "saturn": {
+            "influence": "Discipline and responsibility",
+            "traits": ["disciplined", "responsible", "practical"]
+        },
+        "uranus": {
+            "influence": "Innovation and independence",
+            "traits": ["innovative", "independent", "unconventional"]
+        },
+        "neptune": {
+            "influence": "Spiritual and imaginative tendencies",
+            "traits": ["imaginative", "spiritual", "compassionate"]
+        },
+        "pluto": {
+            "influence": "Transformation and deep insights",
+            "traits": ["transformative", "intense", "insightful"]
+        }
+}'''
+        
+        analysis = parse_chart_response(valid_json_response)
+        
+        # Verify the analysis was parsed correctly
+        self.assertEqual(analysis.sun.influence, "Strong leadership and creativity")
+        self.assertIn("confident", analysis.sun.traits)
+        self.assertEqual(analysis.moon.influence, "Deep emotional nature and intuition")
+        self.assertIn("intuitive", analysis.moon.traits)
     
     def test_parse_chart_response_invalid_json(self):
         """Test parsing invalid JSON response."""
@@ -147,8 +198,43 @@ class TestPersonalityContext(unittest.TestCase):
     
     def test_parse_personality_response_valid(self):
         """Test parsing valid personality response."""
-        # Skip this test for now due to JSON format complexity
-        self.skipTest("JSON format test temporarily disabled")
+        valid_json_response = '''"overview": "A creative and intuitive individual with strong communication skills",
+        "personality_traits": {
+            "description": "Core personality characteristics",
+            "key_traits": ["creative", "intuitive", "communicative", "adaptable"]
+        },
+        "emotional_nature": {
+            "description": "Emotional processing and expression",
+            "emotional_characteristics": ["sensitive", "empathetic", "emotionally intelligent"]
+        },
+        "communication_and_intellect": {
+            "description": "Communication style and intellectual approach",
+            "communication_strengths": ["articulate", "persuasive", "curious"]
+        },
+        "relationships_and_love": {
+            "description": "Approach to relationships and love",
+            "relationship_dynamics": ["loyal", "romantic", "supportive"]
+        },
+        "career_and_purpose": {
+            "description": "Career inclinations and life purpose",
+            "career_potential": ["creative fields", "communication", "helping others"]
+        },
+        "strengths_and_challenges": {
+            "strengths": ["adaptability", "creativity", "intuition"],
+            "challenges": ["overthinking", "sensitivity", "indecision"]
+        },
+        "life_path": {
+            "overview": "A path of creative self-expression and helping others",
+            "key_development_areas": ["self-confidence", "decision-making", "emotional balance"]
+        }
+}'''
+        
+        analysis = parse_personality_response(valid_json_response)
+        
+        # Verify the analysis was parsed correctly
+        self.assertEqual(analysis.overview, "A creative and intuitive individual with strong communication skills")
+        self.assertIn("creative", analysis.personality_traits.key_traits)
+        self.assertIn("sensitive", analysis.emotional_nature.emotional_characteristics)
 
 
 class TestRelationshipContext(unittest.TestCase):
@@ -214,8 +300,39 @@ class TestRelationshipContext(unittest.TestCase):
     
     def test_parse_relationship_response_valid(self):
         """Test parsing valid relationship response."""
-        # Skip this test for now due to JSON format complexity
-        self.skipTest("JSON format test temporarily disabled")
+        valid_json_response = '''"score": 85,
+        "overview": "A highly compatible relationship with strong potential",
+        "compatibility_level": "Excellent",
+        "destiny_signs": "Fire and Water create dynamic balance",
+        "relationship_aspects": [
+            "Strong emotional connection",
+            "Complementary energies",
+            "Good communication potential"
+        ],
+        "strengths": [
+            "Deep emotional understanding",
+            "Balanced give and take",
+            "Shared values"
+        ],
+        "challenges": [
+            "Different communication styles",
+            "Need for patience",
+            "Balancing independence"
+        ],
+        "areas_for_growth": [
+            "Improve listening skills",
+            "Practice patience",
+            "Develop trust"
+        ]
+}'''
+        
+        analysis = parse_relationship_response(valid_json_response)
+        
+        # Verify the analysis was parsed correctly
+        self.assertEqual(analysis.score, 85)
+        self.assertEqual(analysis.overview, "A highly compatible relationship with strong potential")
+        self.assertEqual(analysis.compatibility_level, "Excellent")
+        self.assertIn("Strong emotional connection", analysis.relationship_aspects)
 
 
 class TestChatContext(unittest.TestCase):
@@ -276,8 +393,37 @@ class TestCompositeContext(unittest.TestCase):
     
     def test_parse_composite_response_valid(self):
         """Test parsing valid composite response."""
-        # Skip this test for now due to JSON format complexity
-        self.skipTest("JSON format test temporarily disabled")
+        valid_json_response = '''"overview": "A relationship built on mutual understanding and shared goals",
+        "relationship_identity": {
+            "core_identity": ["harmonious", "growth-oriented", "supportive"]
+        },
+        "emotional_dynamics": {
+            "emotional_patterns": ["deep connection", "empathetic understanding", "emotional stability"]
+        },
+        "communication_style": {
+            "communication_patterns": ["open dialogue", "thoughtful expression", "active listening"]
+        },
+        "love_expression": {
+            "love_patterns": ["affectionate", "romantic", "devoted"]
+        },
+        "public_image": {
+            "external_perception": ["admired couple", "role models", "inspiring"]
+        },
+        "strengths_and_challenges": {
+            "strengths": ["mutual respect", "shared vision", "emotional maturity"],
+            "challenges": ["perfectionism", "high expectations", "work-life balance"]
+        },
+        "long_term_potential": {
+            "future_outlook": ["lasting commitment", "continued growth", "legacy building"]
+        }
+}'''
+        
+        analysis = parse_composite_response(valid_json_response)
+        
+        # Verify the analysis was parsed correctly
+        self.assertEqual(analysis.overview, "A relationship built on mutual understanding and shared goals")
+        self.assertIn("harmonious", analysis.relationship_identity["core_identity"])
+        self.assertIn("mutual respect", analysis.strengths_and_challenges["strengths"])
 
 
 class TestDailyHoroscopeContext(unittest.TestCase):

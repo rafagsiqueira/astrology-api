@@ -1,11 +1,11 @@
 """Astrology module for chart generation."""
 
 from datetime import datetime
-from typing import List
+from typing import List, Union, Literal
 from datetime import date, timedelta
 from kerykeion import AstrologicalSubject, KerykeionChartSVG
 from kerykeion.composite_subject_factory import CompositeSubjectFactory
-from kerykeion.kr_types.kr_models import CompositeSubjectModel, TransitMomentModel
+from kerykeion.kr_types.kr_models import CompositeSubjectModel
 from kerykeion.transits_time_range import TransitsTimeRangeFactory
 from kerykeion.ephemeris_data import EphemerisDataFactory
 import pytz
@@ -122,13 +122,19 @@ def generate_transits(birth_data: BirthData, current_location: CurrentLocation, 
     if period == HoroscopePeriod.year:
         #TODO: Will get periods from day 1 to last day of the year of start_date
         raise Exception("Not implemented yet")
+    look_forward = end_date + timedelta(days=1)
 
     aspects_and_retrograding_planets = []
     
-    ephemeris_factory = EphemerisDataFactory(start_datetime=lookback, end_datetime=end_date, lat=current_location.latitude, lng=current_location.longitude)
+    active_points: List[Union[Literal['Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto', 'Mean_Node', 'True_Node', 'Mean_South_Node', 'True_South_Node', 'Chiron', 'Mean_Lilith'], Literal['Ascendant', 'Medium_Coeli', 'Descendant', 'Imum_Coeli']]] = [
+        'Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 
+        'Uranus', 'Neptune', 'Pluto', 'Ascendant'
+    ]
+
+    ephemeris_factory = EphemerisDataFactory(start_datetime=lookback, end_datetime=look_forward, lat=current_location.latitude, lng=current_location.longitude)
     subjects = ephemeris_factory.get_ephemeris_data_as_astrological_subjects()
 
-    transits = TransitsTimeRangeFactory(natal_chart=subject, ephemeris_data_points=subjects)
+    transits = TransitsTimeRangeFactory(natal_chart=subject, ephemeris_data_points=subjects, active_points=active_points)
     transit_moments = transits.get_transit_moments().transits
     aspects_and_retrograding_planets: list[DailyTransit] = []
     for idx, moment in enumerate(transit_moments):
@@ -243,7 +249,7 @@ def diff_transits(transits: list[DailyTransit]) -> list[DailyTransitChange]:
                 )
             ))
     
-    return diff_results
+    return diff_results[1:-1] if len(diff_results) > 2 else []
 
 def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_svg: bool = True) -> AstrologicalChart:
     """Convert an AstrologicalSubject to an AstrologicalChart."""

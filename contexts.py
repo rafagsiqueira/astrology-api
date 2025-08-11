@@ -678,7 +678,7 @@ def build_horoscope_context(
 
 	1. Analyze the aspect changes:
 	- Focus on aspects that have started or ended recently (within the last few days).
-	- Consider the nature of the planets involved (p_1 is always a planet in the user's natal chart).
+	- Consider the nature of the planets involved.
 	- Interpret the type of aspect (conjunction, opposition, trine, etc.) and its potential influence.
 
 	2. Evaluate the retrograde changes:
@@ -732,9 +732,9 @@ def build_horoscope_context(
 	# Format aspect changes as human-readable strings
 	aspect_changes = []
 	for aspect in transit_changes.aspects.began:
-		aspect_changes.append(f"{aspect.p1_name} {aspect.aspect} {aspect.p2_name} started")
+		aspect_changes.append(f"User's {aspect.p2_name} {aspect.aspect} {aspect.p1_name} started")
 	for aspect in transit_changes.aspects.ended:
-		aspect_changes.append(f"{aspect.p1_name} {aspect.aspect} {aspect.p2_name} ended")
+		aspect_changes.append(f"User's {aspect.p2_name} {aspect.aspect} {aspect.p1_name} ended")
 	
 	# Format retrograde changes as human-readable strings
 	retrograde_changes = []

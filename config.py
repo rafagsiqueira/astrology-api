@@ -3,6 +3,7 @@
 import os
 import logging
 from dotenv import load_dotenv
+from kerykeion.utilities import setup_logging
 
 # Load environment variables from .env file
 load_dotenv()
@@ -18,6 +19,7 @@ logging.getLogger('anthropic._base_client').setLevel(logging.INFO)
 logging.getLogger('anthropic').setLevel(logging.INFO)
 logging.getLogger('httpx').setLevel(logging.INFO)
 logging.getLogger('httpcore').setLevel(logging.INFO)
+logging.getLogger('root').setLevel(logging.INFO)
 
 logger = logging.getLogger(__name__)
 

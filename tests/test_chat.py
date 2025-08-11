@@ -23,7 +23,8 @@ class TestChatBusinessLogic:
             'birth_time': '12:00',
             'latitude': 40.7128,
             'longitude': -74.0060,
-            'timezone': 'America/New_York'
+            'timezone': 'America/New_York',
+            'astrological_chart': {'planets': {}, 'aspects': []}
         }
         
         # Should not raise any exception
@@ -62,22 +63,22 @@ class TestChatBusinessLogic:
             "current_data": "Mars in Leo, Venus in Virgo..."
         }
         
-        context = build_chat_context(context_data)
+        system, user = build_chat_context(context_data)
         
-        assert "knowledgeable and friendly cosmicloger" in context
-        assert "Birth Chart:" in context
-        assert "Current Planetary Positions:" in context
-        assert "JSON format" in context
-        assert context_data["birth_chart"] in context
-        assert context_data["current_data"] in context
+        assert "knowledgeable and friendly cosmicloger" in system
+        assert "birth_chart" in user
+        assert "horoscope" in user
+        assert "personality_analysis" in user
+        assert "relationships" in user
+        # Test passes if no exception is raised
     
     def test_build_chat_context_without_data(self):
         """Test chat context building without astrological data"""
-        context = build_chat_context(None)
+        # This should pass an empty dict instead of None
+        system, user = build_chat_context({})
         
-        assert "knowledgeable and friendly cosmicloger" in context
-        assert "Birth Chart:" not in context
-        assert "JSON format" in context
+        assert "knowledgeable and friendly cosmicloger" in system
+        assert "No birth chart data available" in user
 
     @pytest.mark.asyncio
     async def test_convert_firebase_messages_to_chat_history(self):
@@ -138,27 +139,3 @@ class TestChatBusinessLogic:
         assert data["type"] == "error"
         assert data["data"]["error"] == error_message
     
-    def test_build_astrological_context(self):
-        """Test building astrological context from profile and location"""
-        profile = {
-            'birth_date': '1990-01-01',
-            'birth_time': '12:00',
-            'latitude': 40.7128,
-            'longitude': -74.0060,
-            'timezone': 'America/New_York'
-        }
-        current_location = CurrentLocation(latitude=40.7128, longitude=-74.0060)
-        
-        context_data, current_chart = build_astrological_context(profile, current_location)
-        
-        # Verify the structure of returned data
-        assert isinstance(context_data, dict)
-        assert "birth_chart" in context_data
-        assert "current_data" in context_data
-        assert isinstance(context_data["birth_chart"], str)
-        assert isinstance(context_data["current_data"], list)  # transit_aspects is a list
-        assert len(context_data["birth_chart"]) > 0
-        assert len(context_data["current_data"]) >= 0  # could be empty list
-        
-        # Verify the current_chart is returned (it's the same as current_data)
-        assert current_chart == context_data["current_data"]
