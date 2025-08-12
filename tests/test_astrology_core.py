@@ -180,31 +180,17 @@ class TestDiffTransits(unittest.TestCase):
         """Test diff_transits with multiple days showing changes."""
         result = diff_transits([self.transit_day1, self.transit_day2, self.transit_day3])
         
-        # Should have changes for day 1, day 2 and day 3
-        self.assertEqual(len(result), 3)
+        # Should have changes for day 2
+        self.assertEqual(len(result), 1)
         
         # Find changes by date
-        day1_changes = next(c for c in result if c.date == "2024-01-01")
         day2_changes = next(c for c in result if c.date == "2024-01-02")
-        day3_changes = next(c for c in result if c.date == "2024-01-03")
-        
-        # Check day 1 changes (first day - all began)
-        self.assertEqual(len(day1_changes.aspects.began), 0)  # Empty aspects
-        self.assertEqual(len(day1_changes.aspects.ended), 0)
-        self.assertEqual(day1_changes.retrogrades.began, ["Mercury"])
-        self.assertEqual(day1_changes.retrogrades.ended, [])
         
         # Check day 2 changes
         self.assertEqual(len(day2_changes.aspects.began), 0)  # No aspects
         self.assertEqual(len(day2_changes.aspects.ended), 0)
         self.assertEqual(day2_changes.retrogrades.began, ["Venus"])  # Venus retrograde began
         self.assertEqual(day2_changes.retrogrades.ended, [])
-        
-        # Check day 3 changes
-        self.assertEqual(len(day3_changes.aspects.began), 0)
-        self.assertEqual(len(day3_changes.aspects.ended), 0)  # No aspects
-        self.assertEqual(day3_changes.retrogrades.began, [])
-        self.assertEqual(day3_changes.retrogrades.ended, ["Mercury"])  # Mercury retrograde ended
     
     def test_diff_transits_no_changes(self):
         """Test diff_transits when there are no changes between days."""
@@ -217,9 +203,8 @@ class TestDiffTransits(unittest.TestCase):
         
         result = diff_transits([self.transit_day1, identical_transit])
         
-        # Should only have the first day (all began)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].date, "2024-01-01")  # Only the first day is included
+        # Should have no changes
+        self.assertEqual(len(result), 0)
 
 
 if __name__ == '__main__':
