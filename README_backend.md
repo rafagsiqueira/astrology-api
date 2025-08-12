@@ -57,20 +57,14 @@ Returns a complete astrological chart with planetary positions, houses, aspects,
 
 ## Testing
 
-Run the test suite:
+The project is configured to run unit tests automatically using GitHub Actions. The tests are run on every push and pull request to the `main` branch.
+
+You can also run the tests manually using `pytest`:
+
 ```bash
-./run_tests.sh
+pytest
 ```
 
-Or manually:
-```bash
-python -m pytest test_main.py -v
-```
+## Deployment
 
-### Test Coverage
-- ✅ API health check endpoint
-- ✅ Valid birth chart generation
-- ✅ Different locations and timezones
-- ✅ Invalid data handling
-- ✅ Sign element/modality/ruler mappings
-- ✅ Error scenarios and edge cases
+The project is deployed to Google Cloud Run using a GitHub Actions workflow. To trigger the deployment, you need to manually trigger the `Deploy to Google Cloud Run` workflow in the Actions tab of the GitHub repository.
