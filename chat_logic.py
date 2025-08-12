@@ -1,6 +1,8 @@
 """Business logic for chat functionality, extracted for better testability."""
 
 import json
+import re
+import nltk
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from datetime import datetime
 from anthropic import Anthropic
@@ -331,3 +333,38 @@ def create_completion_response_data(full_response: str, transit_chart=None) -> s
         }
     }
     return f"data: {json.dumps(response_data)}\n\n"
+
+
+def count_sentences(text: str) -> int:
+    """Count the number of sentences in a given text using NLTK."""
+    if not text:
+        return 0
+    try:
+        # NLTK's sentence tokenizer
+        sentences = nltk.sent_tokenize(text)
+        return len(sentences)
+    except Exception as e:
+        logger.error(f"Error tokenizing sentences: {e}")
+        # Fallback to a simple regex if NLTK fails
+        sentences = re.split(r'[.!?]+', text)
+        return len([s for s in sentences if s.strip()])
+
+async def get_user_token_usage(user_id: str, db) -> int:
+    """Get the user's token usage from Firestore."""
+    try:
+        doc_ref = db.collection('token_usage').document(user_id)
+        doc = await doc_ref.get()
+        if doc.exists:
+            return doc.to_dict().get('token_count', 0)
+        return 0
+    except Exception as e:
+        logger.error(f"Error getting token usage for user {user_id}: {e}")
+        return 0
+
+async def update_user_token_usage(user_id: str, new_tokens: int, db):
+    """Update the user's token usage in Firestore."""
+    try:
+        doc_ref = db.collection('token_usage').document(user_id)
+        await doc_ref.set({'token_count': new_tokens}, merge=True)
+    except Exception as e:
+        logger.error(f"Error updating token usage for user {user_id}: {e}")

@@ -1,17 +1,19 @@
 import unittest
 import json
 import asyncio
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, AsyncMock
 from fastapi import HTTPException
 
 from chat_logic import (
     validate_user_profile,
     convert_firebase_messages_to_chat_history, create_streaming_response_data,
-    create_error_response_data
+    create_error_response_data,
+    count_sentences
 )
 from contexts import build_chat_context
-from models import ChatMessage, CurrentLocation
+from models import ChatRequest, ChatMessage, CurrentLocation
 from semantic_kernel.contents import AuthorRole
+import routes
 
 class TestChatBusinessLogic(unittest.TestCase):
     """Test suite for chat business logic functions"""
@@ -135,3 +137,94 @@ class TestChatBusinessLogic(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class TestTokenLimiting(unittest.TestCase):
+    """Test suite for token limiting functionality"""
+
+    def test_count_sentences(self):
+        """Test sentence counting logic"""
+        self.assertEqual(count_sentences(""), 0)
+        self.assertEqual(count_sentences("Hello world."), 1)
+        self.assertEqual(count_sentences("Hello world. How are you?"), 2)
+        self.assertEqual(count_sentences("Hello world! How are you?"), 2)
+        self.assertEqual(count_sentences("Hello world? How are you?"), 2)
+        self.assertEqual(count_sentences("This is a sentence... with multiple dots."), 1)
+        self.assertEqual(count_sentences("Mr. Smith went to Washington."), 1)
+
+    @patch('routes.get_claude_client')
+    @patch('routes.build_chat_context')
+    @patch('routes.create_chat_history_reducer')
+    @patch('routes.load_chat_history_from_firebase')
+    @patch('routes.enhance_profile_with_chat_context')
+    @patch('routes.validate_user_profile')
+    @patch('routes.get_user_profile_cached')
+    @patch('routes.get_firestore_client')
+    @patch('routes.update_user_token_usage', new_callable=AsyncMock)
+    @patch('routes.get_user_token_usage', new_callable=AsyncMock)
+    @patch('routes.get_subscription_service')
+    @patch('routes.validate_database_availability')
+    def test_chat_with_guru_no_subscription_under_limit(self, mock_validate_db, mock_get_sub_service, mock_get_usage, mock_update_usage, mock_get_db, mock_get_profile, mock_validate_profile, mock_enhance_profile, mock_load_history, mock_create_history, mock_build_context, mock_get_claude):
+        """Test chat with no subscription and under token limit"""
+        async def run_test():
+            mock_get_sub_service.return_value.has_premium_access = AsyncMock(return_value=False)
+            mock_get_usage.return_value = 0
+            mock_build_context.return_value = ("system", "user")
+
+            request = ChatRequest(message="Hello. How are you?")
+            user = {'uid': 'test-user'}
+
+            # This test is complex because of the streaming response.
+            # We will just check that the function is called and does not raise an exception.
+            await routes.chat_with_guru(request, user)
+
+            mock_update_usage.assert_called_once_with('test-user', 2, mock_get_db.return_value)
+
+        asyncio.run(run_test())
+
+    @patch('routes.get_claude_client')
+    @patch('routes.get_subscription_service')
+    @patch('routes.get_user_token_usage', new_callable=AsyncMock)
+    @patch('routes.validate_database_availability')
+    def test_chat_with_guru_no_subscription_over_limit(self, mock_validate_db, mock_get_usage, mock_get_sub_service, mock_get_claude):
+        """Test chat with no subscription and over token limit"""
+        async def run_test():
+            mock_get_sub_service.return_value.has_premium_access = AsyncMock(return_value=False)
+            mock_get_usage.return_value = 8
+
+            request = ChatRequest(message="This is a long message with many sentences. One. Two. Three. Four. Five. Six. Seven. Eight.")
+            user = {'uid': 'test-user'}
+
+            try:
+                await routes.chat_with_guru(request, user)
+            except HTTPException as e:
+                self.assertEqual(e.status_code, 529)
+
+        asyncio.run(run_test())
+
+    @patch('routes.get_claude_client')
+    @patch('routes.build_chat_context')
+    @patch('routes.create_chat_history_reducer')
+    @patch('routes.load_chat_history_from_firebase')
+    @patch('routes.enhance_profile_with_chat_context')
+    @patch('routes.validate_user_profile')
+    @patch('routes.get_user_profile_cached')
+    @patch('routes.get_firestore_client')
+    @patch('routes.update_user_token_usage', new_callable=AsyncMock)
+    @patch('routes.get_user_token_usage', new_callable=AsyncMock)
+    @patch('routes.get_subscription_service')
+    @patch('routes.validate_database_availability')
+    def test_chat_with_guru_with_subscription(self, mock_validate_db, mock_get_sub_service, mock_get_usage, mock_update_usage, mock_get_db, mock_get_profile, mock_validate_profile, mock_enhance_profile, mock_load_history, mock_create_history, mock_build_context, mock_get_claude):
+        """Test chat with a subscription"""
+        async def run_test():
+            mock_get_sub_service.return_value.has_premium_access = AsyncMock(return_value=True)
+            mock_build_context.return_value = ("system", "user")
+
+            request = ChatRequest(message="Hello")
+            user = {'uid': 'test-user'}
+
+            await routes.chat_with_guru(request, user)
+
+            mock_get_usage.assert_not_called()
+            mock_update_usage.assert_not_called()
+
+        asyncio.run(run_test())

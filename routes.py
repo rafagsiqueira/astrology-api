@@ -24,8 +24,12 @@ from models import (
 from chat_logic import (
     validate_user_profile,
     load_chat_history_from_firebase,
-    create_chat_history_reducer
+    create_chat_history_reducer,
+    count_sentences,
+    get_user_token_usage,
+    update_user_token_usage
 )
+from subscription_service import get_subscription_service
 
 logger = get_logger(__name__)
 
@@ -442,22 +446,37 @@ async def generate_composite_chart_endpoint(
         raise HTTPException(status_code=500, detail=f"Failed to generate composite chart: {str(e)}")
 
 @router.post("/api/chat")
-async def chat_with_cosmicloger(
+async def chat_with_guru(
     request: ChatRequest,
     user: dict = Depends(verify_firebase_token),
 ):
-    """Chat with AI cosmicloger using Semantic Kernel."""
+    """Chat with AI Cosmic Guru."""
     logger.debug(f"Chat request from user: {user['uid']}")
 
     claude_client = get_claude_client()
     if not claude_client:
         raise HTTPException(status_code=503, detail="Analysis service not available")
     
-    try:
-        # Get database connection
-        db = get_firestore_client()
-        validate_database_availability()
+    # Get database connection
+    db = get_firestore_client()
+    validate_database_availability()
+
+    # Token limiting for non-subscribed users
+    subscription_service = get_subscription_service()
+    has_premium = await subscription_service.has_premium_access(user['uid'])
+
+    if not has_premium:
+        TOKEN_LIMIT = 7  # 5-7 sentences
+        usage = await get_user_token_usage(user['uid'], db)
+        sentences = count_sentences(request.message)
         
+        if usage + sentences > TOKEN_LIMIT:
+            raise HTTPException(status_code=529, detail="You have exceeded your free message limit.")
+            return
+
+        await update_user_token_usage(user['uid'], usage + sentences, db)
+
+    try:
         # Get user profile with caching for context
         profile = get_user_profile_cached(user['uid'], db)
         

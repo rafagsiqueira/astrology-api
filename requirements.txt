@@ -12,3 +12,4 @@ firebase-admin==7.0.0
 pydantic==2.11.7
 PyJWT==2.10.1
 requests-cache==1.2.1
+nltk==3.8.1
