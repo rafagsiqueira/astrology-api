@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cosmic Guru - Your Personal Astrology Companion</title>
+    <title>Avra - Your Personal Astrology Companion</title>
     <meta name="description" content="Discover your cosmic potential with personalized astrology insights, birth chart analysis, and AI-powered guidance.">
     
     <!-- Open Graph / Social Media -->
-    <meta property="og:title" content="Cosmic Guru - Your Personal Astrology Companion">
+    <meta property="og:title" content="Avra - Your Personal Astrology Companion">
     <meta property="og:description" content="Discover your cosmic potential with personalized astrology insights, birth chart analysis, and AI-powered guidance.">
-    <meta property="og:image" content="/images/cosmic-guru-preview.png">
+    <meta property="og:image" content="/images/avra-preview.png">
     <meta property="og:type" content="website">
     
     <!-- Favicons -->
@@ -19,6 +19,12 @@
     
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/dark-hc.css">
+    <link rel="stylesheet" href="css/dark-mc.css">
+    <link rel="stylesheet" href="css/dark.css">
+    <link rel="stylesheet" href="css/light-hc.css">
+    <link rel="stylesheet" href="css/light-mc.css">
+    <link rel="stylesheet" href="css/light.css">
     
     <style>
         * {
@@ -28,25 +34,13 @@
         }
 
         :root {
-            --cosmic-primary: #4A0080;
-            --cosmic-primary-light: #6B1BA3;
-            --cosmic-primary-dark: #3A0066;
-            --cosmic-secondary: #8B5CF6;
-            --cosmic-accent: #A855F7;
-            --cosmic-background: #FEFCFF;
-            --cosmic-surface: #FFFFFF;
-            --cosmic-text: #1F1F1F;
-            --cosmic-text-secondary: #6B7280;
-            --cosmic-border: #E5E7EB;
-            --cosmic-gradient: linear-gradient(135deg, #4A0080 0%, #8B5CF6 50%, #A855F7 100%);
-            --cosmic-gradient-light: linear-gradient(135deg, #F3E8FF 0%, #EDE9FE 100%);
         }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
-            color: var(--cosmic-text);
-            background: var(--cosmic-background);
+            color: var(--md-sys-color-on-surface);
+            background: var(--md-sys-color-surface);
             overflow-x: hidden;
         }
 
@@ -79,13 +73,13 @@
             font-family: 'Playfair Display', serif;
             font-weight: 600;
             font-size: 1.5rem;
-            color: var(--cosmic-primary);
+            color: var(--md-sys-color-primary);
         }
 
         .logo-icon {
             width: 40px;
             height: 40px;
-            background: var(--cosmic-gradient);
+            background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 50%, var(--md-sys-color-tertiary) 100%);
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -96,7 +90,7 @@
 
         /* Hero Section */
         .hero {
-            background: var(--cosmic-gradient-light);
+            background: linear-gradient(135deg, var(--md-sys-color-surface-container-lowest) 0%, var(--md-sys-color-surface-container-low) 100%);
             padding: 4rem 0;
             text-align: center;
             position: relative;
@@ -130,14 +124,14 @@
             font-family: 'Playfair Display', serif;
             font-size: clamp(2.5rem, 5vw, 4rem);
             font-weight: 700;
-            color: var(--cosmic-primary);
+            color: var(--md-sys-color-primary);
             margin-bottom: 1.5rem;
             line-height: 1.1;
         }
 
         .hero p {
             font-size: 1.25rem;
-            color: var(--cosmic-text-secondary);
+            color: var(--md-sys-color-on-surface-variant);
             margin-bottom: 2.5rem;
             max-width: 600px;
             margin-left: auto;
@@ -157,8 +151,8 @@
             align-items: center;
             gap: 12px;
             padding: 12px 24px;
-            background: var(--cosmic-primary);
-            color: white;
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
             text-decoration: none;
             border-radius: 12px;
             font-weight: 500;
@@ -167,7 +161,7 @@
         }
 
         .download-btn:hover {
-            background: var(--cosmic-primary-light);
+            background: var(--md-sys-color-primary-container);
             transform: translateY(-2px);
             box-shadow: 0 6px 30px rgba(74, 0, 128, 0.4);
         }
@@ -191,13 +185,13 @@
         .section-title h2 {
             font-family: 'Playfair Display', serif;
             font-size: 2.5rem;
-            color: var(--cosmic-primary);
+            color: var(--md-sys-color-primary);
             margin-bottom: 1rem;
         }
 
         .section-title p {
             font-size: 1.1rem;
-            color: var(--cosmic-text-secondary);
+            color: var(--md-sys-color-on-surface-variant);
             max-width: 600px;
             margin: 0 auto;
         }
@@ -251,7 +245,7 @@
             border-radius: 20px;
             overflow: hidden;
             box-shadow: 0 8px 32px rgba(74, 0, 128, 0.3);
-            background: var(--cosmic-gradient-light);
+            background: linear-gradient(135deg, var(--md-sys-color-surface-container-lowest) 0%, var(--md-sys-color-surface-container-low) 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -284,8 +278,8 @@
             transform: translate(-50%, -50%);
             width: 40px;
             height: 40px;
-            border: 3px solid var(--cosmic-border);
-            border-top-color: var(--cosmic-primary);
+            border: 3px solid var(--md-sys-color-outline);
+            border-top-color: var(--md-sys-color-primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -296,7 +290,7 @@
 
         .feature-label {
             font-weight: 600;
-            color: var(--cosmic-primary);
+            color: var(--md-sys-color-primary);
             margin-top: 1rem;
             text-align: center;
         }
@@ -304,7 +298,7 @@
         /* Reviews Section */
         .reviews {
             padding: 4rem 0;
-            background: var(--cosmic-gradient-light);
+            background: linear-gradient(135deg, var(--md-sys-color-surface-container-lowest) 0%, var(--md-sys-color-surface-container-low) 100%);
             position: relative;
         }
 
@@ -331,7 +325,7 @@
             position: absolute;
             bottom: 1rem;
             right: 2rem;
-            color: var(--cosmic-text-secondary);
+            color: var(--md-sys-color-on-surface-variant);
             font-size: 0.9rem;
             opacity: 0.7;
             pointer-events: none;
@@ -364,7 +358,7 @@
 
         .review-text {
             font-style: italic;
-            color: var(--cosmic-text);
+            color: var(--md-sys-color-on-surface);
             margin-bottom: 1.5rem;
             line-height: 1.6;
         }
@@ -379,7 +373,7 @@
             width: 48px;
             height: 48px;
             border-radius: 50%;
-            background: var(--cosmic-gradient);
+            background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 50%, var(--md-sys-color-tertiary) 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -388,13 +382,13 @@
         }
 
         .review-details h4 {
-            color: var(--cosmic-primary);
+            color: var(--md-sys-color-primary);
             font-weight: 600;
             margin-bottom: 4px;
         }
 
         .review-details p {
-            color: var(--cosmic-text-secondary);
+            color: var(--md-sys-color-on-surface-variant);
             font-size: 0.9rem;
         }
 
@@ -415,12 +409,12 @@
             text-align: center;
             padding: 2rem;
             border-radius: 16px;
-            border: 2px solid var(--cosmic-border);
+            border: 2px solid var(--md-sys-color-outline);
             transition: all 0.3s ease;
         }
 
         .feature-card:hover {
-            border-color: var(--cosmic-primary);
+            border-color: var(--md-sys-color-primary);
             transform: translateY(-4px);
             box-shadow: 0 8px 30px rgba(74, 0, 128, 0.15);
         }
@@ -428,7 +422,7 @@
         .feature-icon {
             width: 80px;
             height: 80px;
-            background: var(--cosmic-gradient);
+            background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 50%, var(--md-sys-color-tertiary) 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -439,21 +433,21 @@
         }
 
         .feature-card h3 {
-            color: var(--cosmic-primary);
+            color: var(--md-sys-color-primary);
             font-weight: 600;
             margin-bottom: 1rem;
             font-size: 1.3rem;
         }
 
         .feature-card p {
-            color: var(--cosmic-text-secondary);
+            color: var(--md-sys-color-on-surface-variant);
             line-height: 1.6;
         }
 
         /* CTA Section */
         .cta {
             padding: 4rem 0;
-            background: var(--cosmic-gradient);
+            background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-secondary) 50%, var(--md-sys-color-tertiary) 100%);
             color: white;
             text-align: center;
         }
@@ -476,7 +470,7 @@
 
         .cta .download-btn {
             background: white;
-            color: var(--cosmic-primary);
+            color: var(--md-sys-color-primary);
         }
 
         .cta .download-btn:hover {
@@ -486,8 +480,8 @@
 
         /* Footer */
         footer {
-            background: var(--cosmic-primary-dark);
-            color: white;
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
             padding: 2rem 0;
             text-align: center;
         }
@@ -506,7 +500,7 @@
         }
 
         .footer-links a {
-            color: white;
+            color: var(--md-sys-color-on-primary);
             text-decoration: none;
             opacity: 0.8;
             transition: opacity 0.3s ease;
@@ -751,28 +745,6 @@
             }
         }
 
-        /* Dark mode support */
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --cosmic-background: #0F0F23;
-                --cosmic-surface: #1A1A2E;
-                --cosmic-text: #FFFFFF;
-                --cosmic-text-secondary: #B3B3B3;
-                --cosmic-border: #2D2D4A;
-                --cosmic-gradient-light: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%);
-            }
-
-            .screenshot-mockup {
-                background: var(--cosmic-gradient);
-                color: white;
-            }
-
-            .review-card,
-            .feature-card {
-                background: var(--cosmic-surface);
-                border-color: var(--cosmic-border);
-            }
-        }
 
         /* Loading Animation */
         .loading {
@@ -790,13 +762,13 @@
         }
     </style>
 </head>
-<body>
+<body class="light-medium-contrast">
     <!-- Header -->
     <header>
         <nav class="container">
             <div class="logo">
                 <div class="logo-icon">✨</div>
-                <span>Cosmic Guru</span>
+                <span>Avra</span>
             </div>
         </nav>
     </header>
@@ -827,14 +799,14 @@
         <div class="container">
             <div class="section-title">
                 <h2>Experience Cosmic Insights</h2>
-                <p>See how Cosmic Guru brings personalized astrology to life with beautiful, intuitive design</p>
+                <p>See how Avra brings personalized astrology to life with beautiful, intuitive design</p>
             </div>
             
             <div class="screenshot-carousel">
                 <div class="screenshot">
                     <div class="screenshot-content">
                         <div class="screenshot-image">
-                            <img src="assets/screen1.png" alt="Cosmic Guru Birth Chart Screen" loading="lazy">
+                            <img src="assets/screen1.png" alt="Avra Birth Chart Screen" loading="lazy">
                         </div>
                     </div>
                 </div>
@@ -842,7 +814,7 @@
                 <div class="screenshot">
                     <div class="screenshot-content">
                         <div class="screenshot-image">
-                            <img src="assets/screen2.png" alt="Cosmic Guru Personality Analysis Screen" loading="lazy">
+                            <img src="assets/screen2.png" alt="Avra Personality Analysis Screen" loading="lazy">
                         </div>
                         <div class="feature-label">Birth chart</div>
                     </div>
@@ -851,7 +823,7 @@
                 <div class="screenshot">
                     <div class="screenshot-content">
                         <div class="screenshot-image">
-                            <img src="assets/screen3.png" alt="Cosmic Guru Relationship Analysis Screen" loading="lazy">
+                            <img src="assets/screen3.png" alt="Avra Relationship Analysis Screen" loading="lazy">
                         </div>
                         <div class="feature-label">Birth chart explained</div>
                     </div>
@@ -860,7 +832,7 @@
                 <div class="screenshot">
                     <div class="screenshot-content">
                         <div class="screenshot-image">
-                            <img src="assets/screen4.png" alt="Cosmic Guru AI Chat Screen" loading="lazy">
+                            <img src="assets/screen4.png" alt="Avra AI Chat Screen" loading="lazy">
                         </div>
                         <div class="feature-label">Personality analysis</div>
                     </div>
@@ -935,7 +907,7 @@
     <section class="cta">
         <div class="container">
             <h2>Begin Your Cosmic Journey Today</h2>
-            <p>Download Cosmic Guru and discover the celestial forces that shape your destiny</p>
+            <p>Download Avra and discover the celestial forces that shape your destiny</p>
             
             <div class="download-buttons">
                 <a href="#" class="download-btn" id="cta-app-store">
@@ -956,7 +928,7 @@
             <div class="footer-content">
                 <div class="logo">
                     <div class="logo-icon">✨</div>
-                    <span>Cosmic Guru</span>
+                    <span>Avra</span>
                 </div>
                 <div class="footer-links">
                     <a href="#privacy">Privacy Policy</a>
@@ -964,7 +936,7 @@
                     <a href="#support">Support</a>
                 </div>
             </div>
-            <p style="margin-top: 1rem; opacity: 0.7;">© 2024 Cosmic Guru. All rights reserved.</p>
+            <p style="margin-top: 1rem; opacity: 0.7;">© 2024 Avra. All rights reserved.</p>
         </div>
     </footer>
 
