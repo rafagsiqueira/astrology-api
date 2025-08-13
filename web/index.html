@@ -19,12 +19,12 @@
     
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/dark-hc.css">
-    <link rel="stylesheet" href="css/dark-mc.css">
-    <link rel="stylesheet" href="css/dark.css">
-    <link rel="stylesheet" href="css/light-hc.css">
-    <link rel="stylesheet" href="css/light-mc.css">
-    <link rel="stylesheet" href="css/light.css">
+    <link rel="stylesheet" href="css/light.css" media="(prefers-color-scheme: light)">
+    <link rel="stylesheet" href="css/light-mc.css" media="(prefers-color-scheme: light) and (prefers-contrast: more)">
+    <link rel="stylesheet" href="css/light-hc.css" media="(prefers-color-scheme: light) and (prefers-contrast: high)">
+    <link rel="stylesheet" href="css/dark.css" media="(prefers-color-scheme: dark)">
+    <link rel="stylesheet" href="css/dark-mc.css" media="(prefers-color-scheme: dark) and (prefers-contrast: more)">
+    <link rel="stylesheet" href="css/dark-hc.css" media="(prefers-color-scheme: dark) and (prefers-contrast: high)">
     
     <style>
         * {
@@ -225,7 +225,7 @@
             transform: translateX(-50%);
             width: 60px;
             height: 4px;
-            background: #000;
+            background: var(--md-sys-color-on-surface);
             border-radius: 2px;
             opacity: 0.3;
         }
@@ -350,11 +350,6 @@
             position: relative;
         }
 
-        .review-stars {
-            color: #FFA500;
-            font-size: 1.2rem;
-            margin-bottom: 1rem;
-        }
 
         .review-text {
             font-style: italic;
@@ -762,7 +757,7 @@
         }
     </style>
 </head>
-<body class="light-medium-contrast">
+<body>
     <!-- Header -->
     <header>
         <nav class="container">
