@@ -8,7 +8,7 @@
             "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "python": ".conda/bin/python",
+            "python": "venv/bin/python",
             "args": []
         },
         {
@@ -18,7 +18,7 @@
             "module": "pytest",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "python": ".conda/bin/python",
+            "python": "venv/bin/python",
             "args": [
                 "-v",
                 "${file}"
@@ -32,7 +32,7 @@
             "module": "pytest",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "python": ".conda/bin/python",
+            "python": "venv/bin/python",
             "args": [
                 "-v"
             ],

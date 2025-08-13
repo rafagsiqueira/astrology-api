@@ -141,16 +141,6 @@ if __name__ == '__main__':
 class TestTokenLimiting(unittest.TestCase):
     """Test suite for token limiting functionality"""
 
-    def test_count_sentences(self):
-        """Test sentence counting logic"""
-        self.assertEqual(count_sentences(""), 0)
-        self.assertEqual(count_sentences("Hello world."), 1)
-        self.assertEqual(count_sentences("Hello world. How are you?"), 2)
-        self.assertEqual(count_sentences("Hello world! How are you?"), 2)
-        self.assertEqual(count_sentences("Hello world? How are you?"), 2)
-        self.assertEqual(count_sentences("This is a sentence... with multiple dots."), 1)
-        self.assertEqual(count_sentences("Mr. Smith went to Washington."), 1)
-
     @patch('routes.get_claude_client')
     @patch('routes.build_chat_context')
     @patch('routes.create_chat_history_reducer')

@@ -12,6 +12,7 @@
 .swiftpm/
 migrate_working_dir/
 .conda
+venv
 
 # IntelliJ related
 *.iml
