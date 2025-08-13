@@ -187,7 +187,7 @@ async def call_claude_with_analytics(claude_client, endpoint_name: str, user_id:
 @router.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "Cosmic Guru API is running"}
+    return {"message": "Avra API is running"}
 
 @router.post("/api/generate-chart", response_model=AstrologicalChart)
 async def generate_chart_endpoint(
