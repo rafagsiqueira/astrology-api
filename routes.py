@@ -7,7 +7,7 @@ from kerykeion.relationship_score import RelationshipScoreFactory
 from datetime import datetime
 import json
 import traceback
-from contexts import build_birth_chart_context, build_chat_context, build_horoscope_context, build_personality_context, build_relationship_context, build_composite_context, parse_chart_response, parse_personality_response, parse_relationship_response, parse_composite_response
+from contexts import build_birth_chart_context, build_chat_context, build_daily_messages_context, build_horoscope_context, build_personality_context, build_relationship_context, build_composite_context, parse_chart_response, parse_personality_response, parse_relationship_response, parse_composite_response
 from profile_cache import cache, get_user_profile_cached
 from analytics_service import get_analytics_service
 from appstore_notifications import get_notification_handler
@@ -16,9 +16,9 @@ from astrology import create_astrological_subject, create_astrological_subject, 
 from config import get_logger, get_claude_client
 from auth import verify_firebase_token, get_firestore_client, validate_database_availability
 from models import (
-    BirthData, AstrologicalChart, CurrentLocation, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
-    RelationshipAnalysisRequest, HoroscopeRequest, HoroscopeResponse, CompositeAnalysisRequest, CompositeAnalysis,
-    DailyTransitRequest, DailyTransitResponse, DailyHoroscopeRequest, DailyHoroscopeResponse,
+    BirthData, AstrologicalChart, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
+    RelationshipAnalysisRequest, CompositeAnalysisRequest, CompositeAnalysis,
+    DailyTransitRequest, DailyTransitResponse,
     GenerateHoroscopeRequest, GenerateHoroscopeResponse
 )
 from chat_logic import (
@@ -584,6 +584,11 @@ async def get_daily_transits(
     logger.debug(f"Daily transit request from user: {user['uid']} for date: {request.target_date}")
     
     try:
+
+        # Validate Claude client
+        claude_client = get_claude_client()
+        if not claude_client:
+            raise HTTPException(status_code=503, detail="Horoscope generation service not available")
         
         # Parse target date
         target_date = datetime.fromisoformat(request.target_date)
@@ -598,6 +603,42 @@ async def get_daily_transits(
         
         # Generate transit changes (diff)
         changes = diff_transits(transits)
+
+        (system_prompt, user_prompt) = build_daily_messages_context(request.birth_data, changes)
+
+        logger.debug("Calling Claude API for horoscope generation")
+        
+        # Call Claude API with analytics tracking
+        response = await call_claude_with_analytics(
+            claude_client=claude_client,
+            endpoint_name="generate-horoscope",
+            user_id=user['uid'],
+            model="claude-3-5-haiku-latest",
+            max_tokens=1000,
+            temperature=0.7,
+            system=[
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
+            messages=[
+                {
+                    "role": "user", 
+                    "content": user_prompt
+                },
+                {"role": "assistant", "content": "{"}
+            ]
+        )
+
+        assert_end_turn(response)
+        
+        # Parse response - cast to TextBlock to access text attribute
+        from anthropic.types import TextBlock
+        text_block = response.content[0]
+        if isinstance(text_block, TextBlock):
+            messages = parse_daily_messages_response(text_block.text)
         
         # Return transits with changes in the expected response format
         response = DailyTransitResponse(transits=transits, changes=changes)

@@ -749,6 +749,95 @@ def build_horoscope_context(
 		RETROGRADE_CHANGES=retrograde_changes
 	))
 
+def build_daily_messages_context(
+	birth_data: BirthData,
+	transit_changes: list[DailyTransitChange]
+) -> tuple[str, str]:
+	system = """
+You are a motivational guru with a knack for astrology. Your task is to create personalized,
+uplifting messages for the users based on their astrological aspects and any changes in planetary
+retrogrades. You will be given information on changes to astrological aspects, changes in retrograding planets and the user's birth day.
+
+For each day, analyze the provided astrological changes:
+1. Review the aspect changes and identify any significant conjunctions, trines, or other notable
+aspects.
+2. Check for any planets entering or leaving retrograde.
+3. Compare the user's birth date with the current date to determine if it's their birthday.
+
+Craft motivational messages for each day following these guidelines:
+1. Write 2 to 3 sentences welcoming the user to that day.
+2. Incorporate at least one specific astrological aspect or retrograde change into your message.
+3. Frame the astrological information in a positive, motivational context.
+4. If it's the user's birthday, include a birthday wish in your message.
+
+Examples of how to phrase your message:
+- "Watch out for that Mercury in Retrograde, but use it as an opportunity for introspection and
+personal growth!"
+- "You have a lovely conjunction of your birth sun and Mars starting today! Now is the time to focus
+on your career and pursue your passions with renewed energy."
+
+Ensure your messages are uplifting, personalized, and incorporates the astrological information provided.
+<formatting>
+Output your answer in JSON using the following format:
+{{
+	"messages": [
+		{{
+			"date": str,
+			"message": str
+		}}
+	]
+}}
+</formatting>
+"""
+
+	user = """
+Here is the information on the changes to astrological aspects:
+<aspect_changes>
+{ASPECT_CHANGES}
+</aspect_changes>
+
+Here is the information on the changes to retrograding planets:
+<retrograde_changes>
+{RETROGRADE_CHANGES}
+</retrograde_changes>
+
+Here is the information on the user's birth date:
+<birth_date>
+{BIRTH_DATE}
+</birth_date>
+
+Craft your daily motivational messages.
+"""
+
+	# Format aspect changes as human-readable strings
+	aspect_changes = []
+	for day in transit_changes:
+		dict_change = {"date": day.date, "aspect_changes": []}
+		for aspect in day.aspects.began:
+			dict_change["aspect_changes"].append(f"User's {aspect.p2_name} {aspect.aspect} {aspect.p1_name} started")
+		for aspect in day.aspects.ended:
+			dict_change["aspect_changes"].append(f"User's {aspect.p2_name} {aspect.aspect} {aspect.p1_name} ended")
+		aspect_changes.append(dict)
+
+	# Format retrograde changes as human-readable strings
+	retrograde_changes = []
+	for day in transit_changes:
+		dict_change = {"date": day.date, "retrograde_changes": []}
+		for planet in day.retrogrades.began:
+			dict_change["retrograde_changes"].append(f"{planet} started retrograde")
+		for planet in day.retrogrades.ended:
+			dict_change["retrograde_changes"].append(f"{planet} ended retrograde")
+		retrograde_changes.append(dict)
+
+	return (system, user.format(
+		BIRTH_DATE=birth_data.birth_date,
+		ASPECT_CHANGES=aspect_changes,
+		RETROGRADE_CHANGES=retrograde_changes
+	))
+
+def parse_daily_messages_response(response: str):
+	# TODO: Implement parsing of daily messages
+	print("TODO")
 
 def personality_analysis_to_string(personality_data: Optional[Any]) -> str:
 	"""Convert personality analysis data to a readable string format.
