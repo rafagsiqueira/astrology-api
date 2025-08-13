@@ -49,3 +49,7 @@
   --md-sys-color-surface-container-high: rgb(60 59 65);
   --md-sys-color-surface-container-highest: rgb(71 70 76);
 }
+
+.review-stars {
+  color: var(--md-sys-color-tertiary);
+}
