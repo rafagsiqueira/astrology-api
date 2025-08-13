@@ -7,7 +7,7 @@ from kerykeion.relationship_score import RelationshipScoreFactory
 from datetime import datetime
 import json
 import traceback
-from contexts import build_birth_chart_context, build_chat_context, build_daily_messages_context, build_horoscope_context, build_personality_context, build_relationship_context, build_composite_context, parse_chart_response, parse_personality_response, parse_relationship_response, parse_composite_response
+from contexts import build_birth_chart_context, build_chat_context, build_daily_messages_context, build_horoscope_context, build_personality_context, build_relationship_context, build_composite_context, parse_chart_response, parse_daily_messages_response, parse_personality_response, parse_relationship_response, parse_composite_response
 from profile_cache import cache, get_user_profile_cached
 from analytics_service import get_analytics_service
 from appstore_notifications import get_notification_handler

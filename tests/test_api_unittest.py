@@ -16,7 +16,7 @@ class TestAPIEndpoints(unittest.TestCase):
         """Test the root health check endpoint"""
         from routes import root
         result = asyncio.run(root())
-        self.assertEqual(result, {"message": "Cosmic Guru API is running"})
+        self.assertEqual(result, {"message": "Avra API is running"})
 
     def test_generate_chart_endpoint_integration(self):
         """Test that generate_chart_endpoint properly calls business logic and handles errors"""
@@ -549,32 +549,46 @@ class TestAPIEndpoints(unittest.TestCase):
             period=HoroscopePeriod.day
         )
         auth_user = {'uid': 'test-user-123'}
-        
-        with patch('routes.generate_transits') as mock_generate:
-            with patch('routes.diff_transits') as mock_diff:
-                from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
-                
-                mock_daily_transit = DailyTransit(
-                    date=datetime(2024, 1, 1),
-                    aspects=[],
-                    retrograding=["Mercury"]
-                )
-                
-                mock_transit_change = DailyTransitChange(
-                    date="2024-01-01",
-                    aspects=TransitChanges(began=[], ended=[]),
-                    retrogrades=RetrogradeChanges(began=["Mercury"], ended=[])
-                )
-                
-                mock_generate.return_value = [mock_daily_transit]
-                mock_diff.return_value = [mock_transit_change]
-                
-                result = asyncio.run(get_daily_transits(request, auth_user))
-                
-                self.assertEqual(result.transits, [mock_daily_transit])
-                self.assertEqual(result.changes, [mock_transit_change])
-                mock_generate.assert_called_once()
-                mock_diff.assert_called_once_with([mock_daily_transit])
+        with patch('routes.get_claude_client') as mock_get_claude:
+            with patch('routes.generate_transits') as mock_generate:
+                with patch('routes.diff_transits') as mock_diff:
+                    from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
+                    
+                    mock_daily_transit = DailyTransit(
+                        date=datetime(2024, 1, 1),
+                        aspects=[],
+                        retrograding=["Mercury"]
+                    )
+                    
+                    mock_transit_change = DailyTransitChange(
+                        date="2024-01-01",
+                        aspects=TransitChanges(began=[], ended=[]),
+                        retrogrades=RetrogradeChanges(began=["Mercury"], ended=[])
+                    )
+                    
+                    mock_generate.return_value = [mock_daily_transit]
+                    mock_diff.return_value = [mock_transit_change]
+
+                    from anthropic.types import TextBlock
+                    mock_text_block = Mock(spec=TextBlock)
+                    mock_text_block.text = "Mocked Claude response daily transits"
+
+                    mock_usage = Mock()
+                    mock_usage.input_tokens = 100
+                    mock_usage.output_tokens = 50
+
+                    mock_claude_response = Mock()
+                    mock_claude_response.content = [mock_text_block]
+                    mock_claude_response.usage = mock_usage
+                    mock_claude_response.stop_reason = 'end_turn'
+                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                    
+                    result = asyncio.run(get_daily_transits(request, auth_user))
+                    
+                    self.assertEqual(result.transits, [mock_daily_transit])
+                    self.assertEqual(result.changes, [mock_transit_change])
+                    mock_generate.assert_called_once()
+                    mock_diff.assert_called_once_with([mock_daily_transit])
 
     def test_get_daily_transits_invalid_date(self):
         """Test daily transits with invalid date format"""
@@ -689,40 +703,54 @@ class TestAPIEndpoints(unittest.TestCase):
             period=HoroscopePeriod.week
         )
         auth_user = {'uid': 'test-user-123'}
-        
-        with patch('routes.generate_transits') as mock_generate:
-            with patch('routes.diff_transits') as mock_diff:
-                from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
-                
-                mock_transits = []
-                mock_changes = []
-                for i in range(7):
-                    mock_transit = DailyTransit(
-                        date=datetime(2024, 1, i + 1),
-                        aspects=[],
-                        retrograding=[]
-                    )
-                    mock_transits.append(mock_transit)
+        with patch('routes.get_claude_client') as mock_get_claude:
+            with patch('routes.generate_transits') as mock_generate:
+                with patch('routes.diff_transits') as mock_diff:
+                    from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
                     
-                    mock_change = DailyTransitChange(
-                        date=f"2024-01-0{i+1}",
-                        aspects=TransitChanges(began=[], ended=[]),
-                        retrogrades=RetrogradeChanges(began=[], ended=[])
-                    )
-                    mock_changes.append(mock_change)
-                
-                mock_generate.return_value = mock_transits
-                mock_diff.return_value = mock_changes
-                
-                result = asyncio.run(get_daily_transits(request, auth_user))
-                
-                self.assertEqual(len(result.transits), 7)
-                self.assertEqual(len(result.changes), 7)
-                mock_generate.assert_called_once_with(
-                    birth_data=birth_data,
-                    current_location=current_location,
-                    start_date=mock_generate.call_args[1]['start_date'],
-                    period=HoroscopePeriod.week
+                    mock_transits = []
+                    mock_changes = []
+                    for i in range(7):
+                        mock_transit = DailyTransit(
+                            date=datetime(2024, 1, i + 1),
+                            aspects=[],
+                            retrograding=[]
+                        )
+                        mock_transits.append(mock_transit)
+                        
+                        mock_change = DailyTransitChange(
+                            date=f"2024-01-0{i+1}",
+                            aspects=TransitChanges(began=[], ended=[]),
+                            retrogrades=RetrogradeChanges(began=[], ended=[])
+                        )
+                        mock_changes.append(mock_change)
+                    
+                    mock_generate.return_value = mock_transits
+                    mock_diff.return_value = mock_changes
+
+                    from anthropic.types import TextBlock
+                    mock_text_block = Mock(spec=TextBlock)
+                    mock_text_block.text = "Mocked Claude response daily transits"
+
+                    mock_usage = Mock()
+                    mock_usage.input_tokens = 100
+                    mock_usage.output_tokens = 50
+
+                    mock_claude_response = Mock()
+                    mock_claude_response.content = [mock_text_block]
+                    mock_claude_response.usage = mock_usage
+                    mock_claude_response.stop_reason = 'end_turn'
+                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                    
+                    result = asyncio.run(get_daily_transits(request, auth_user))
+                    
+                    self.assertEqual(len(result.transits), 7)
+                    self.assertEqual(len(result.changes), 7)
+                    mock_generate.assert_called_once_with(
+                        birth_data=birth_data,
+                        current_location=current_location,
+                        start_date=mock_generate.call_args[1]['start_date'],
+                        period=HoroscopePeriod.week
                 )
 
     def test_get_daily_transits_monthly_period(self):
@@ -749,33 +777,48 @@ class TestAPIEndpoints(unittest.TestCase):
         )
         auth_user = {'uid': 'test-user-123'}
         
-        with patch('routes.generate_transits') as mock_generate:
-            with patch('routes.diff_transits') as mock_diff:
-                from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
-                
-                mock_transits = [DailyTransit(
-                    date=datetime(2024, 1, i + 1),
-                    aspects=[],
-                    retrograding=[]
-                ) for i in range(30)]
-                mock_changes = [DailyTransitChange(
-                    date=f"2024-01-{i+1:02d}",
-                    aspects=TransitChanges(began=[], ended=[]),
-                    retrogrades=RetrogradeChanges(began=[], ended=[])
-                ) for i in range(30)]
-                
-                mock_generate.return_value = mock_transits
-                mock_diff.return_value = mock_changes
-                
-                result = asyncio.run(get_daily_transits(request, auth_user))
-                
-                self.assertEqual(len(result.transits), 30)
-                self.assertEqual(len(result.changes), 30)
-                mock_generate.assert_called_once_with(
-                    birth_data=birth_data,
-                    current_location=current_location,
-                    start_date=mock_generate.call_args[1]['start_date'],
-                    period=HoroscopePeriod.month
+        with patch('routes.get_claude_client') as mock_get_claude:
+            with patch('routes.generate_transits') as mock_generate:
+                with patch('routes.diff_transits') as mock_diff:
+                    from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
+                    
+                    mock_transits = [DailyTransit(
+                        date=datetime(2024, 1, i + 1),
+                        aspects=[],
+                        retrograding=[]
+                    ) for i in range(30)]
+                    mock_changes = [DailyTransitChange(
+                        date=f"2024-01-{i+1:02d}",
+                        aspects=TransitChanges(began=[], ended=[]),
+                        retrogrades=RetrogradeChanges(began=[], ended=[])
+                    ) for i in range(30)]
+                    
+                    mock_generate.return_value = mock_transits
+                    mock_diff.return_value = mock_changes
+
+                    from anthropic.types import TextBlock
+                    mock_text_block = Mock(spec=TextBlock)
+                    mock_text_block.text = "Mocked Claude response daily transits"
+
+                    mock_usage = Mock()
+                    mock_usage.input_tokens = 100
+                    mock_usage.output_tokens = 50
+
+                    mock_claude_response = Mock()
+                    mock_claude_response.content = [mock_text_block]
+                    mock_claude_response.usage = mock_usage
+                    mock_claude_response.stop_reason = 'end_turn'
+                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                    
+                    result = asyncio.run(get_daily_transits(request, auth_user))
+                    
+                    self.assertEqual(len(result.transits), 30)
+                    self.assertEqual(len(result.changes), 30)
+                    mock_generate.assert_called_once_with(
+                        birth_data=birth_data,
+                        current_location=current_location,
+                        start_date=mock_generate.call_args[1]['start_date'],
+                        period=HoroscopePeriod.month
                 )
 
     def test_get_daily_transits_unauthenticated_user(self):
@@ -832,28 +875,43 @@ class TestAPIEndpoints(unittest.TestCase):
             'name': 'Test User'
         }
         
-        with patch('routes.generate_transits') as mock_generate:
-            with patch('routes.diff_transits') as mock_diff:
-                from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
-                
-                mock_transit = DailyTransit(
-                    date=datetime(2024, 1, 1),
-                    aspects=[],
-                    retrograding=[]
-                )
-                mock_change = DailyTransitChange(
-                    date="2024-01-01",
-                    aspects=TransitChanges(began=[], ended=[]),
-                    retrogrades=RetrogradeChanges(began=[], ended=[])
-                )
-                mock_generate.return_value = [mock_transit]
-                mock_diff.return_value = [mock_change]
-                
-                result = asyncio.run(get_daily_transits(request, auth_user))
-                
-                self.assertEqual(result.transits, [mock_transit])
-                self.assertEqual(result.changes, [mock_change])
-                mock_generate.assert_called_once()
+        with patch('routes.get_claude_client') as mock_get_claude:
+            with patch('routes.generate_transits') as mock_generate:
+                with patch('routes.diff_transits') as mock_diff:
+                    from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
+                    
+                    mock_transit = DailyTransit(
+                        date=datetime(2024, 1, 1),
+                        aspects=[],
+                        retrograding=[]
+                    )
+                    mock_change = DailyTransitChange(
+                        date="2024-01-01",
+                        aspects=TransitChanges(began=[], ended=[]),
+                        retrogrades=RetrogradeChanges(began=[], ended=[])
+                    )
+                    mock_generate.return_value = [mock_transit]
+                    mock_diff.return_value = [mock_change]
+
+                    from anthropic.types import TextBlock
+                    mock_text_block = Mock(spec=TextBlock)
+                    mock_text_block.text = "Mocked Claude response daily transits"
+
+                    mock_usage = Mock()
+                    mock_usage.input_tokens = 100
+                    mock_usage.output_tokens = 50
+
+                    mock_claude_response = Mock()
+                    mock_claude_response.content = [mock_text_block]
+                    mock_claude_response.usage = mock_usage
+                    mock_claude_response.stop_reason = 'end_turn'
+                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                    
+                    result = asyncio.run(get_daily_transits(request, auth_user))
+                    
+                    self.assertEqual(result.transits, [mock_transit])
+                    self.assertEqual(result.changes, [mock_change])
+                    mock_generate.assert_called_once()
 
     def test_get_daily_transits_missing_user_fields(self):
         """Test daily transits endpoint with user missing required fields"""
