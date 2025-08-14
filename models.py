@@ -1,4 +1,4 @@
-"""Pydantic models for the Cosmic Guru API."""
+"""Pydantic models for the Avra API."""
 
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional
@@ -227,7 +227,7 @@ class AddPartnerRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    """Request for chat with cosmicloger."""
+    """Request for chat with astrologer."""
     message: str
 
 class RelationshipAnalysisRequest(BaseModel):

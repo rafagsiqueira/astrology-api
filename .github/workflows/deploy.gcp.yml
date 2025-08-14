@@ -21,12 +21,12 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/cosmic-guru-backend:$GITHUB_SHA
+          gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/avra-backend:$GITHUB_SHA
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy cosmic-guru-backend \
-            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/cosmic-guru-backend:$GITHUB_SHA \
+          gcloud run deploy avra-backend \
+            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/avra-backend:$GITHUB_SHA \
             --region us-central1 \
             --platform managed \
             --allow-unauthenticated

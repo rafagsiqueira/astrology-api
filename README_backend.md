@@ -1,6 +1,6 @@
-# Cosmic Guru Python Backend
+# Avra Python Backend
 
-This is the Python backend API for the Cosmic Guru Flutter app, providing astrological chart generation using the kerykeion library.
+This is the Python backend API for the Avra Flutter app, providing astrological chart generation using the kerykeion library.
 
 ## Setup
 

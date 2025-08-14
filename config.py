@@ -1,4 +1,4 @@
-"""Configuration module for Cosmic Guru backend."""
+"""Configuration module for Avra backend."""
 
 import os
 import logging
@@ -28,7 +28,7 @@ ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 FIRESTORE_DATABASE_ID = os.getenv('FIRESTORE_DATABASE_ID')
 
 # App configuration
-APP_TITLE = "Cosmic Guru API"
+APP_TITLE = "Avra API"
 APP_VERSION = "1.0.0"
 
 # CORS configuration

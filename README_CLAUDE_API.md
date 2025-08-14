@@ -1,6 +1,6 @@
 # Claude API Integration
 
-The Cosmic Guru backend integrates with Claude AI for personality analysis based on astrological charts.
+The Avra backend integrates with Claude AI for personality analysis based on astrological charts.
 
 ## Setup
 

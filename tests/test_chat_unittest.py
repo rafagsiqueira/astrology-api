@@ -68,7 +68,7 @@ class TestChatBusinessLogic(unittest.TestCase):
 
         system, user = build_chat_context(context_data)
 
-        self.assertIn("knowledgeable and friendly cosmicloger", system)
+        self.assertIn("knowledgeable and friendly astrologer", system)
         self.assertIn("birth_chart", user)
         self.assertIn("horoscope", user)
         self.assertIn("personality_analysis", user)
@@ -78,7 +78,7 @@ class TestChatBusinessLogic(unittest.TestCase):
         """Test chat context building without astrological data"""
         system, user = build_chat_context({})
 
-        self.assertIn("knowledgeable and friendly cosmicloger", system)
+        self.assertIn("knowledgeable and friendly astrologer", system)
         self.assertIn("No birth chart data available", user)
 
     def test_convert_firebase_messages_to_chat_history(self):

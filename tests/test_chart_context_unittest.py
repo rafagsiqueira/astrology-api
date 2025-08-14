@@ -79,7 +79,7 @@ class TestBuildBirthChartContext(unittest.TestCase):
         """Test that the context contains required astrological elements."""
         (cached, user) = build_birth_chart_context(self.chart)
         
-        self.assertIn("expert cosmicloger", cached)
+        self.assertIn("expert astrologer", cached)
         self.assertIn("planet-house combinations", user)
         self.assertIn("JSON format", cached)
         
@@ -134,7 +134,7 @@ class TestBuildBirthChartContext(unittest.TestCase):
         
         self.assertIsInstance(user, str)
         self.assertGreater(len(user), 0)
-        self.assertIn("expert cosmicloger", cached)
+        self.assertIn("expert astrologer", cached)
 
 
 class TestParseChartResponse(unittest.TestCase):

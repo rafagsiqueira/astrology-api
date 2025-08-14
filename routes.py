@@ -1,4 +1,4 @@
-"""API routes for the Cosmic Guru application."""
+"""API routes for the Avra application."""
 
 import anthropic
 from fastapi import APIRouter, HTTPException, Depends
@@ -450,7 +450,7 @@ async def chat_with_guru(
     request: ChatRequest,
     user: dict = Depends(verify_firebase_token),
 ):
-    """Chat with AI Cosmic Guru."""
+    """Chat with Avra."""
     logger.debug(f"Chat request from user: {user['uid']}")
 
     claude_client = get_claude_client()

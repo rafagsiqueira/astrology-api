@@ -186,9 +186,9 @@ class SubscriptionAnalyticsEvent(BaseModel):
 
 # Product ID mappings (replace with your actual product IDs)
 PRODUCT_ID_MAPPINGS = {
-    "com.cosmicguru.weekly": SubscriptionType.WEEKLY,
-    "com.cosmicguru.monthly": SubscriptionType.MONTHLY,
-    "com.cosmicguru.lifetime": SubscriptionType.LIFETIME,
+    "com.digify.avra.weekly": SubscriptionType.WEEKLY,
+    "com.digify.avra.monthly": SubscriptionType.MONTHLY,
+    "com.digify.avra.lifetime": SubscriptionType.LIFETIME,
 }
 
 # Reverse mapping for quick lookup

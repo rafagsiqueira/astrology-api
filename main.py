@@ -1,4 +1,4 @@
-"""Main application file for Cosmic Guru backend."""
+"""Main application file for Avra backend."""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,7 +35,7 @@ app.include_router(router)
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": "cosmic-guru-backend"}
+    return {"status": "healthy", "service": "avra-backend"}
 
 if __name__ == "__main__":
     import uvicorn

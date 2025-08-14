@@ -1,1 +1,1 @@
-# Test package for Cosmic Guru backend
+# Test package for Avra backend
