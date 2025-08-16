@@ -84,12 +84,12 @@ class TestChartGeneration(unittest.TestCase):
         
         self.assertTrue(hasattr(chart, 'planets'))
         self.assertTrue(hasattr(chart, 'houses'))
-        self.assertTrue(hasattr(chart, 'sunSign'))
-        self.assertTrue(hasattr(chart, 'moonSign'))
+        self.assertTrue(hasattr(chart, 'sun_sign'))
+        self.assertTrue(hasattr(chart, 'moon_sign'))
         self.assertTrue(hasattr(chart, 'ascendant'))
-        self.assertTrue(hasattr(chart, 'chartSvg'))
+        self.assertTrue(hasattr(chart, 'light_svg'))
         
-        sun_sign = chart.sunSign
+        sun_sign = chart.sun_sign
         self.assertTrue(hasattr(sun_sign, 'name'))
         self.assertTrue(hasattr(sun_sign, 'element'))
         self.assertTrue(hasattr(sun_sign, 'modality'))
@@ -152,7 +152,7 @@ class TestChartGeneration(unittest.TestCase):
         )
         
         chart = generate_birth_chart(birth_data)
-        svg_content = chart.chartSvg
+        svg_content = chart.light_svg
         
         self.assertTrue(svg_content.startswith('<svg') or svg_content.startswith('<?xml'))
         self.assertIn('<svg', svg_content)
@@ -178,15 +178,15 @@ class TestChartGeneration(unittest.TestCase):
         
         valid_signs = ["Ari", "Tau", "Gem", "Can", "Leo", "Vir", 
                       "Lib", "Sco", "Sag", "Cap", "Aqu", "Pis"]
-        self.assertIn(chart.sunSign.name, valid_signs)
-        self.assertIn(chart.moonSign.name, valid_signs)
+        self.assertIn(chart.sun_sign.name, valid_signs)
+        self.assertIn(chart.moon_sign.name, valid_signs)
         self.assertIn(chart.ascendant.name, valid_signs)
         
         valid_elements = ["Fire", "Earth", "Air", "Water"]
-        self.assertIn(chart.sunSign.element, valid_elements)
+        self.assertIn(chart.sun_sign.element, valid_elements)
         
         valid_modalities = ["Cardinal", "Fixed", "Mutable"]
-        self.assertIn(chart.sunSign.modality, valid_modalities)
+        self.assertIn(chart.sun_sign.modality, valid_modalities)
     
     def test_generate_birth_chart_and_save_svg(self):
         """Test chart generation and save SVG for manual inspection"""
@@ -203,7 +203,7 @@ class TestChartGeneration(unittest.TestCase):
         
         output_path = Path(__file__).parent.parent / "test_output_chart.svg"
         
-        svg_content = chart.chartSvg
+        svg_content = chart.light_svg
         
         svg_content = re.sub(r'width="[^"]*"', 'width="484px"', svg_content)
         svg_content = re.sub(r'height="[^"]*"', 'height="484px"', svg_content)
@@ -216,7 +216,7 @@ class TestChartGeneration(unittest.TestCase):
         self.assertGreater(output_path.stat().st_size, 1000)
         
         print(f"✅ Chart SVG saved to: {output_path}")
-        print(f"📊 Chart details: Sun in {chart.sunSign.name}, Moon in {chart.moonSign.name}, Ascendant in {chart.ascendant.name}")
+        print(f"📊 Chart details: Sun in {chart.sun_sign.name}, Moon in {chart.moon_sign.name}, Ascendant in {chart.ascendant.name}")
 
 if __name__ == '__main__':
     unittest.main()

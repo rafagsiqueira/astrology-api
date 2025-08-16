@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from config import (
     APP_TITLE, APP_VERSION, CORS_ORIGINS, CORS_CREDENTIALS, 
@@ -27,6 +28,8 @@ app.add_middleware(
     allow_methods=CORS_METHODS,
     allow_headers=CORS_HEADERS,
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Include routes
 app.include_router(router)

@@ -52,10 +52,11 @@ class TestBirthChartContext(unittest.TestCase):
         return AstrologicalChart(
             planets=planets,
             houses=houses,
-            sunSign=SignData(name='Leo', element='Fire', modality='Fixed', ruling_planet='Sun'),
-            moonSign=SignData(name='Cancer', element='Water', modality='Cardinal', ruling_planet='Moon'),
+            sun_sign=SignData(name='Leo', element='Fire', modality='Fixed', ruling_planet='Sun'),
+            moon_sign=SignData(name='Cancer', element='Water', modality='Cardinal', ruling_planet='Moon'),
             ascendant=SignData(name='Scorpio', element='Water', modality='Fixed', ruling_planet='Pluto'),
-            chartSvg='<svg>mock chart</svg>'
+            light_svg='<svg>mock chart</svg>',
+            dark_svg='<svg>mock chart</svg>'
         )
     
     def test_build_birth_chart_context_structure(self):
@@ -145,10 +146,9 @@ class TestBirthChartContext(unittest.TestCase):
         empty_chart = AstrologicalChart(
             planets={},
             houses={},
-            sunSign=SignData(name='Unknown', element='Unknown', modality='Unknown', ruling_planet='Unknown'),
-            moonSign=SignData(name='Unknown', element='Unknown', modality='Unknown', ruling_planet='Unknown'),
+            sun_sign=SignData(name='Unknown', element='Unknown', modality='Unknown', ruling_planet='Unknown'),
+            moon_sign=SignData(name='Unknown', element='Unknown', modality='Unknown', ruling_planet='Unknown'),
             ascendant=SignData(name='Unknown', element='Unknown', modality='Unknown', ruling_planet='Unknown'),
-            chartSvg=""
         )
         
         system, user = build_birth_chart_context(empty_chart)
@@ -176,10 +176,9 @@ class TestPersonalityContext(unittest.TestCase):
         return AstrologicalChart(
             planets=planets,
             houses={},
-            sunSign=SignData(name='Gemini', element='Air', modality='Mutable', ruling_planet='Mercury'),
-            moonSign=SignData(name='Pisces', element='Water', modality='Mutable', ruling_planet='Neptune'),
+            sun_sign=SignData(name='Gemini', element='Air', modality='Mutable', ruling_planet='Mercury'),
+            moon_sign=SignData(name='Pisces', element='Water', modality='Mutable', ruling_planet='Neptune'),
             ascendant=SignData(name='Gemini', element='Air', modality='Mutable', ruling_planet='Mercury'),
-            chartSvg=""
         )
     
     def test_build_personality_context_structure(self):
@@ -253,10 +252,9 @@ class TestRelationshipContext(unittest.TestCase):
                 'moon': PlanetPosition(name='Moon', sign='Libra', house=7, degree=15.0)
             },
             houses={},
-            sunSign=SignData(name='Aries', element='Fire', modality='Cardinal', ruling_planet='Mars'),
-            moonSign=SignData(name='Libra', element='Air', modality='Cardinal', ruling_planet='Venus'),
+            sun_sign=SignData(name='Aries', element='Fire', modality='Cardinal', ruling_planet='Mars'),
+            moon_sign=SignData(name='Libra', element='Air', modality='Cardinal', ruling_planet='Venus'),
             ascendant=SignData(name='Aries', element='Fire', modality='Cardinal', ruling_planet='Mars'),
-            chartSvg=""
         )
     
     def _create_partner_chart(self):
@@ -267,10 +265,9 @@ class TestRelationshipContext(unittest.TestCase):
                 'moon': PlanetPosition(name='Moon', sign='Capricorn', house=10, degree=25.0)
             },
             houses={},
-            sunSign=SignData(name='Cancer', element='Water', modality='Cardinal', ruling_planet='Moon'),
-            moonSign=SignData(name='Capricorn', element='Earth', modality='Cardinal', ruling_planet='Saturn'),
+            sun_sign=SignData(name='Cancer', element='Water', modality='Cardinal', ruling_planet='Moon'),
+            moon_sign=SignData(name='Capricorn', element='Earth', modality='Cardinal', ruling_planet='Saturn'),
             ascendant=SignData(name='Cancer', element='Water', modality='Cardinal', ruling_planet='Moon'),
-            chartSvg=""
         )
     
     def test_build_relationship_context_structure(self):
@@ -377,10 +374,9 @@ class TestCompositeContext(unittest.TestCase):
                 'sun': PlanetPosition(name='Sun', sign='Virgo', house=6, degree=12.0)
             },
             houses={},
-            sunSign=SignData(name='Virgo', element='Earth', modality='Mutable', ruling_planet='Mercury'),
-            moonSign=SignData(name='Virgo', element='Earth', modality='Mutable', ruling_planet='Mercury'),
+            sun_sign=SignData(name='Virgo', element='Earth', modality='Mutable', ruling_planet='Mercury'),
+            moon_sign=SignData(name='Virgo', element='Earth', modality='Mutable', ruling_planet='Mercury'),
             ascendant=SignData(name='Virgo', element='Earth', modality='Mutable', ruling_planet='Mercury'),
-            chartSvg=""
         )
     
     def test_build_composite_context_structure(self):
@@ -455,10 +451,11 @@ class TestDailyHoroscopeContext(unittest.TestCase):
                 'moon': PlanetPosition(name='Moon', sign='Pisces', house=12, degree=8.3)
             },
             houses={},
-            sunSign=SignData(name='Gemini', element='Air', modality='Mutable', ruling_planet='Mercury'),
-            moonSign=SignData(name='Pisces', element='Water', modality='Mutable', ruling_planet='Neptune'),
+            sun_sign=SignData(name='Gemini', element='Air', modality='Mutable', ruling_planet='Mercury'),
+            moon_sign=SignData(name='Pisces', element='Water', modality='Mutable', ruling_planet='Neptune'),
             ascendant=SignData(name='Gemini', element='Air', modality='Mutable', ruling_planet='Mercury'),
-            chartSvg="<svg>mock chart</svg>"
+            light_svg="<svg>mock chart</svg>",
+            dark_svg='<svg>mock chart</svg>'
         )
         
         # Create mock transit changes

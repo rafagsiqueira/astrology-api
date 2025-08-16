@@ -314,7 +314,8 @@ class TestAPIEndpoints(unittest.TestCase):
                                 mock_create_subject.return_value = Mock()
                                 mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=85, score_description="High", is_destiny_sign=True, aspects=[])
                                 mock_chart = Mock()
-                                mock_chart.chartImageUrl = "https://test.com/chart.svg"
+                                mock_chart.light_svg = "<svg></svg>"
+                                mock_chart.dark_svg = "<svg></svg>"
                                 mock_generate_chart.return_value = mock_chart
                                 
                                 from anthropic.types import TextBlock
@@ -493,7 +494,7 @@ class TestAPIEndpoints(unittest.TestCase):
                                 mock_create_subject.return_value = Mock()
                                 mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=35, score_description="Low", is_destiny_sign=False, aspects=[])
                                 mock_chart = Mock()
-                                mock_chart.chartImageUrl = "https://test.com/chart.svg"
+                                mock_chart.light_svg = "https://test.com/chart.svg"
                                 mock_generate_chart.return_value = mock_chart
                                 
                                 from anthropic.types import TextBlock
@@ -844,7 +845,7 @@ class TestAPIEndpoints(unittest.TestCase):
         )
         
         with self.assertRaises(Exception):
-            asyncio.run(get_daily_transits(request, None))
+            asyncio.run(get_daily_transits(request, {}))
 
     def test_get_daily_transits_valid_authenticated_user(self):
         """Test daily transits endpoint with valid authenticated user"""

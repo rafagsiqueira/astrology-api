@@ -109,11 +109,11 @@ class TestHoroscopeAPI(unittest.TestCase):
             chart = AstrologicalChart(
                 planets=planets,
                 houses=houses,
-                sunSign=sun_sign,
-                moonSign=moon_sign,
+                sun_sign=sun_sign,
+                moon_sign=moon_sign,
                 ascendant=ascendant,
-                chartSvg=f"<svg>chart day {i}</svg>",
-                chartImageUrl=f"https://example.com/chart-{i}.svg"
+                light_svg=f"<svg>chart day {i}</svg>",
+                dark_svg=f"<svg>chart day {i}</svg>"
             )
             charts.append(chart)
         

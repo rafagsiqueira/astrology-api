@@ -355,8 +355,10 @@ async def analyze_relationship(
             analysis = parse_relationship_response(text_block.text)
             
             # Add the chart URLs to the analysis response
-            analysis.person1_chart_url = birth_chart_1.chartImageUrl
-            analysis.person2_chart_url = birth_chart_2.chartImageUrl
+            analysis.person1_light = birth_chart_1.light_svg
+            analysis.person1_dark = birth_chart_1.dark_svg
+            analysis.person2_light = birth_chart_2.light_svg
+            analysis.person2_dark = birth_chart_2.dark_svg
             
             logger.debug("Relationship analysis completed successfully")
             return analysis
@@ -415,7 +417,7 @@ async def analyze_composite(
             analysis = parse_composite_response(text_block.text)
             
             # Add the chart SVG URL to the analysis response
-            analysis.chart_svg_url = composite_chart.chartImageUrl
+            # analysis.chart_svg_url = composite_chart.chartImageUrl
             
             logger.debug("Composite analysis completed successfully")
             return analysis

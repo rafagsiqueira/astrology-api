@@ -61,11 +61,11 @@ class TestBuildBirthChartContext(unittest.TestCase):
         self.chart = AstrologicalChart(
             planets=self.planets,
             houses=self.houses,
-            sunSign=self.sun_sign,
-            moonSign=self.moon_sign,
+            sun_sign=self.sun_sign,
+            moon_sign=self.moon_sign,
             ascendant=self.ascendant,
-            chartSvg="<svg>mock chart</svg>",
-            chartImageUrl="https://example.com/chart.jpg"
+            light_svg="<svg>mock chart</svg>",
+            dark_svg="<svg>mock chart</svg>"
         )
     
     def test_build_birth_chart_context_returns_string(self):
@@ -124,10 +124,11 @@ class TestBuildBirthChartContext(unittest.TestCase):
         empty_chart = AstrologicalChart(
             planets={},
             houses=self.houses,
-            sunSign=self.sun_sign,
-            moonSign=self.moon_sign,
+            sun_sign=self.sun_sign,
+            moon_sign=self.moon_sign,
             ascendant=self.ascendant,
-            chartSvg="<svg>mock chart</svg>"
+            light_svg="<svg>mock chart</svg>",
+            dark_svg="<svg>mock chart</svg>"
         )
         
         (cached, user) = build_birth_chart_context(empty_chart)

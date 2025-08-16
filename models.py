@@ -70,11 +70,11 @@ class AstrologicalChart(BaseModel):
     """Complete astrological chart data."""
     planets: Dict[str, PlanetPosition]
     houses: Dict[str, HousePosition]
-    sunSign: SignData
-    moonSign: SignData
+    sun_sign: SignData
+    moon_sign: SignData
     ascendant: SignData
-    chartSvg: str
-    chartImageUrl: Optional[str] = None
+    light_svg: Optional[str] = None
+    dark_svg: Optional[str] = None
     analysis: Optional[ChartAnalysis] = None
     
     def to_string(self) -> str:
@@ -85,8 +85,8 @@ class AstrologicalChart(BaseModel):
                                for name, house in self.houses.items()])
         
         return f"""Astrological Chart:
-Sun Sign: {self.sunSign.name} ({self.sunSign.element}, {self.sunSign.modality})
-Moon Sign: {self.moonSign.name} ({self.moonSign.element}, {self.moonSign.modality})
+Sun Sign: {self.sun_sign.name} ({self.sun_sign.element}, {self.sun_sign.modality})
+Moon Sign: {self.moon_sign.name} ({self.moon_sign.element}, {self.moon_sign.modality})
 Ascendant: {self.ascendant.name} ({self.ascendant.element}, {self.ascendant.modality})
 
 Planets: {planets_str}
@@ -246,8 +246,10 @@ class RelationshipAnalysis(BaseModel):
     strengths: list
     challenges: list
     areas_for_growth: list
-    person1_chart_url: Optional[str] = None
-    person2_chart_url: Optional[str] = None
+    person1_light: Optional[str] = None
+    person1_dark: Optional[str] = None
+    person2_light: Optional[str] = None
+    person2_dark: Optional[str] = None
 
 class HoroscopePeriod(Enum):
     day = 'day'

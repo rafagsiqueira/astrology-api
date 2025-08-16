@@ -322,38 +322,28 @@ def subject_to_chart(subject: AstrologicalSubject | CompositeSubjectModel, with_
         )
         
         # Generate SVG if requested
-        svg_content = ""
-        chart_image_url = None
+        dark_svg = None
+        light_svg = None
         
         if with_svg:
             try:
                 chart_svg = KerykeionChartSVG(first_obj=subject, chart_type="Natal", theme="dark")
-                svg_content = chart_svg.makeWheelOnlyTemplate(minify=True, remove_css_variables=True)
+                dark_svg = chart_svg.makeWheelOnlyTemplate(minify=True, remove_css_variables=True)
+                chart_svg = KerykeionChartSVG(first_obj=subject, chart_type="Natal", theme="light")
+                light_svg = chart_svg.makeWheelOnlyTemplate(minify=True, remove_css_variables=True)
+
                 logger.debug("Chart SVG generated successfully")
             except Exception as svg_error:
                 logger.error(f"Failed to generate chart SVG: {svg_error}")
-            
-            # Upload SVG to cloud storage if available
-            if svg_content and svg_content != "<svg><text>Chart generation failed</text></svg>":
-                try:
-                    from cloud_storage import upload_chart_to_storage
-                    chart_image_url = upload_chart_to_storage(svg_content)
-                    
-                    if chart_image_url:
-                        logger.debug(f"Chart uploaded to cloud storage: {chart_image_url}")
-                    else:
-                        logger.warning("Failed to upload chart to cloud storage")
-                except Exception as storage_error:
-                    logger.error(f"Error uploading chart to storage: {storage_error}")
         
         return AstrologicalChart(
             planets=planets_dict,
             houses=houses_dict,
-            sunSign=sun_sign,
-            moonSign=moon_sign,
+            sun_sign=sun_sign,
+            moon_sign=moon_sign,
             ascendant=ascendant_sign,
-            chartSvg=svg_content,
-            chartImageUrl=chart_image_url
+            light_svg=light_svg,
+            dark_svg=dark_svg
         )
         
     except Exception as e:
