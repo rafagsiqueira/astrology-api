@@ -572,7 +572,7 @@ class TestAPIEndpoints(unittest.TestCase):
 
                     from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = "Mocked Claude response daily transits"
+                    mock_text_block.text = '"daily_messages": [{"title": "Daily Focus", "message": "Today is a good day for reflection.", "period": "day"}]}'
 
                     mock_usage = Mock()
                     mock_usage.input_tokens = 100
@@ -731,7 +731,7 @@ class TestAPIEndpoints(unittest.TestCase):
 
                     from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = "Mocked Claude response daily transits"
+                    mock_text_block.text = '"daily_messages": [{"title": "Daily Focus", "message": "Today is a good day for reflection.", "period": "day"}]}'
 
                     mock_usage = Mock()
                     mock_usage.input_tokens = 100
@@ -799,7 +799,7 @@ class TestAPIEndpoints(unittest.TestCase):
 
                     from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = "Mocked Claude response daily transits"
+                    mock_text_block.text = '"daily_messages": [{"title": "Daily Focus", "message": "Today is a good day for reflection.", "period": "day"}]}'
 
                     mock_usage = Mock()
                     mock_usage.input_tokens = 100
@@ -896,7 +896,7 @@ class TestAPIEndpoints(unittest.TestCase):
 
                     from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = "Mocked Claude response daily transits"
+                    mock_text_block.text = '"daily_messages": [{"title": "Daily Focus", "message": "Today is a good day for reflection.", "period": "day"}]}'
 
                     mock_usage = Mock()
                     mock_usage.input_tokens = 100

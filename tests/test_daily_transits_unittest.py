@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime
 from unittest.mock import Mock, patch
 from models import (
-    DailyTransitRequest, DailyTransitResponse, BirthData, CurrentLocation, 
+    DailyTransitRequest, DailyTransitResponse, BirthData, CurrentLocation, Horoscope, 
     HoroscopePeriod, DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
 )
 from pydantic import ValidationError
@@ -109,7 +109,7 @@ class TestDailyTransitModels(unittest.TestCase):
         
         with self.assertRaises(ValidationError):
             DailyTransitRequest(
-                birth_data={},
+                birth_data=BirthData(birth_date="", birth_time="", latitude=0, longitude=0),
                 current_location=current_location,
                 target_date="2024-01-01T00:00:00"
             )
@@ -126,7 +126,7 @@ class TestDailyTransitModels(unittest.TestCase):
         with self.assertRaises(ValidationError):
             DailyTransitRequest(
                 birth_data=birth_data,
-                current_location={},
+                current_location=CurrentLocation(latitude=0.0, longitude=0.0),
                 target_date="2024-01-01T00:00:00"
             )
 
@@ -141,10 +141,13 @@ class TestDailyTransitModels(unittest.TestCase):
         mock_change.date = "2024-01-01"
         mock_change.aspects = Mock(spec=TransitChanges)
         mock_change.retrogrades = Mock(spec=RetrogradeChanges)
+
+        mock_messages = Mock(spec=list[Horoscope])
         
         response = DailyTransitResponse(
             transits=[mock_transit],
-            changes=[mock_change]
+            changes=[mock_change],
+            messages=None
         )
         
         self.assertEqual(len(response.transits), 1)
@@ -156,7 +159,8 @@ class TestDailyTransitModels(unittest.TestCase):
         """Test DailyTransitResponse with empty lists."""
         response = DailyTransitResponse(
             transits=[],
-            changes=[]
+            changes=[],
+            messages=[]
         )
         
         self.assertEqual(len(response.transits), 0)
@@ -405,7 +409,7 @@ class TestDailyTransitFunctions(unittest.TestCase):
         from astrology import diff_transits
         
         with self.assertRaises(Exception):
-            diff_transits(None)
+            diff_transits([])
         
         invalid_transit = Mock()
         invalid_transit.date = "not-a-datetime"
@@ -442,7 +446,7 @@ class TestDailyTransitIntegration(unittest.TestCase):
         
         changes = diff_transits(transits)
         
-        response = DailyTransitResponse(transits=transits, changes=changes)
+        response = DailyTransitResponse(transits=transits, changes=changes, messages=None)
         
         self.assertEqual(len(response.transits), 2)
         self.assertEqual(len(response.changes), 0)

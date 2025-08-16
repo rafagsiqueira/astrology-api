@@ -320,10 +320,15 @@ class DailyTransitChange(BaseModel):
     aspects: TransitChanges
     retrogrades: RetrogradeChanges
 
+class Horoscope(BaseModel):
+    date: str
+    message: str
+
 class DailyTransitResponse(BaseModel):
     """Daily transit data response."""
     transits: list[DailyTransit]
     changes: list[DailyTransitChange]
+    messages: Optional[list[Horoscope]]
 
 class DailyHoroscopeRequest(BaseModel):
     """Request for daily horoscope analysis."""

@@ -16,7 +16,7 @@ from astrology import create_astrological_subject, create_astrological_subject, 
 from config import get_logger, get_claude_client
 from auth import verify_firebase_token, get_firestore_client, validate_database_availability
 from models import (
-    BirthData, AstrologicalChart, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
+    BirthData, AstrologicalChart, Horoscope, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
     RelationshipAnalysisRequest, CompositeAnalysisRequest, CompositeAnalysis,
     DailyTransitRequest, DailyTransitResponse,
     GenerateHoroscopeRequest, GenerateHoroscopeResponse
@@ -635,18 +635,18 @@ async def get_daily_transits(
         )
 
         assert_end_turn(response)
+
+        daily_transit_response = DailyTransitResponse(transits=transits, changes=changes, messages=None)
         
         # Parse response - cast to TextBlock to access text attribute
         from anthropic.types import TextBlock
         text_block = response.content[0]
         if isinstance(text_block, TextBlock):
-            messages = parse_daily_messages_response(text_block.text)
-        
-        # Return transits with changes in the expected response format
-        response = DailyTransitResponse(transits=transits, changes=changes)
+            messages: list[Horoscope] = parse_daily_messages_response(text_block.text)
+            daily_transit_response.messages = messages
         
         logger.debug(f"Daily transit data generated successfully: {len(transits)} transits")
-        return response
+        return daily_transit_response
         
     except Exception as e:
         logger.error(f"Error generating daily transits: {e}")

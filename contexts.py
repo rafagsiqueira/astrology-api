@@ -1,7 +1,7 @@
 from typing import Any, Dict, Optional
 
 from astrology import generate_birth_chart
-from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, DailyTransit, DailyTransitChange, HoroscopePeriod, PersonalityAnalysis, RelationshipAnalysis, CompositeAnalysis
+from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, DailyTransit, DailyTransitChange, Horoscope, HoroscopePeriod, PersonalityAnalysis, RelationshipAnalysis, CompositeAnalysis
 from config import get_logger
 from kerykeion.kr_types.kr_models import RelationshipScoreModel, TransitsTimeRangeModel   
 import json
@@ -835,9 +835,28 @@ Craft your daily motivational messages.
 		RETROGRADE_CHANGES=retrograde_changes
 	))
 
-def parse_daily_messages_response(response: str):
-	# TODO: Implement parsing of daily messages
-	print("TODO")
+def parse_daily_messages_response(response: str) -> list[Horoscope]:
+	"""Parse the structured analysis response from Claude.
+	
+	Args:
+		response: The raw response string from Claude API.
+		
+	Returns:
+		ChartAnalysis: Parsed analysis content.
+
+	Raises:
+		ValueError: If the response format is invalid or parsing fails.
+	"""
+	interpolated_response = "{" + response
+	try:
+		json_data = json.loads(interpolated_response)
+		return json_data
+	except json.JSONDecodeError as e:
+		logger.error(f"Failed to parse daily messages: {e}")
+		raise ValueError("Invalid response format") from e
+	except Exception as e:
+		logger.error(f"Unexpected error while parsing daily messages response: {e}")
+		raise ValueError("Error processing daily messages response") from e
 
 def personality_analysis_to_string(personality_data: Optional[Any]) -> str:
 	"""Convert personality analysis data to a readable string format.
