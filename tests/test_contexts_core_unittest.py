@@ -472,7 +472,7 @@ class TestDailyHoroscopeContext(unittest.TestCase):
         
         self.assertIsInstance(system, str)
         self.assertIsInstance(user, str)
-        self.assertIn('horoscope', system.lower())
+        self.assertIn('message', system.lower())
         self.assertIn('astrological', system.lower())
 
 

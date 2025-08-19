@@ -102,17 +102,48 @@ class TestChartGeneration(unittest.TestCase):
         self.assertTrue(hasattr(subject, 'day'))
     
     @patch('astrology.logger')
-    def test_create_astrological_subject_invalid_data(self, mock_logger):
-        """Test creating astrological subject with invalid data."""
-        invalid_data = BirthData(
-            birth_date='invalid-date',  # Invalid date format
-            birth_time='25:70',  # Invalid time format
-            latitude=200,  # Invalid latitude
-            longitude=200   # Invalid longitude
+    def test_create_astrological_subject_invalid_coordinates(self, mock_logger):
+        """Test creating astrological subject with invalid coordinates."""
+        from pydantic import ValidationError
+        
+        # Test invalid latitude
+        with self.assertRaises(ValidationError):
+            BirthData(
+                birth_date='1990-01-01',
+                birth_time='12:00',
+                latitude=200,  # Invalid latitude
+                longitude=-74.0060
+            )
+        
+        # Test invalid longitude
+        with self.assertRaises(ValidationError):
+            BirthData(
+                birth_date='1990-01-01',
+                birth_time='12:00',
+                latitude=40.7128,
+                longitude=200  # Invalid longitude
+            )
+
+    @patch('astrology.logger')
+    def test_create_astrological_subject_invalid_datetime_format(self, mock_logger):
+        """Test creating astrological subject with invalid date/time format."""
+        from unittest.mock import patch
+        
+        # Create a valid BirthData object but with an invalid date format that will fail in datetime.fromisoformat
+        # We need to bypass Pydantic validation by creating the object with valid values first
+        birth_data = BirthData(
+            birth_date='1990-01-01',
+            birth_time='12:00',
+            latitude=40.7128,
+            longitude=-74.0060
         )
         
-        with self.assertRaises(Exception):
-            create_astrological_subject(invalid_data)
+        # Then manually set invalid values to test the datetime parsing in create_astrological_subject
+        birth_data.birth_date = 'invalid-date'
+        birth_data.birth_time = '25:70'
+        
+        with self.assertRaises(ValueError):
+            create_astrological_subject(birth_data)
 
 
 class TestTransitGeneration(unittest.TestCase):
