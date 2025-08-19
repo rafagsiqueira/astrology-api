@@ -653,63 +653,6 @@ async def get_daily_transits(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to generate daily transits: {str(e)}")
 
-@router.post("/api/generate-horoscope", response_model=GenerateHoroscopeResponse)
-async def generate_horoscope(
-    request: GenerateHoroscopeRequest,
-    user: dict = Depends(verify_firebase_token)
-):
-    """Generate a personalized horoscope based on transit changes."""
-    try:
-        logger.info(f"Generating horoscope for transit changes on {request.transit_changes.date}")
-        
-        # Validate Claude client
-        claude_client = get_claude_client()
-        if not claude_client:
-            raise HTTPException(status_code=503, detail="Horoscope generation service not available")
-        
-        birth_chart = generate_birth_chart(request.birth_data, with_svg=False)
-
-        # Build context for Claude
-        system_prompt, user_prompt = build_horoscope_context(birth_chart=birth_chart, transit_changes=request.transit_changes)
-        
-        logger.debug("Calling Claude API for horoscope generation")
-        
-        # Call Claude API with analytics tracking
-        response = await call_claude_with_analytics(
-            claude_client=claude_client,
-            endpoint_name="generate-horoscope",
-            user_id=user['uid'],
-            model="claude-3-5-haiku-latest",
-            max_tokens=1000,
-            temperature=0.7,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"}
-                }
-            ],
-            messages=[{
-                "role": "user", 
-                "content": user_prompt
-            }]
-        )
-        
-        # Extract horoscope text from Claude response
-        horoscope_text = response.content[0].text if response.content else "Unable to generate horoscope at this time."
-        
-        logger.debug(f"Horoscope generated successfully for date {request.transit_changes.date}")
-        
-        return GenerateHoroscopeResponse(
-            horoscope_text=horoscope_text,
-            target_date=request.transit_changes.date
-        )
-        
-    except Exception as e:
-        logger.error(f"Error generating horoscope: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to generate horoscope: {str(e)}")
-
 @router.post("/api/appstore-notifications")
 async def handle_appstore_notifications(request: dict):
     """Handle App Store Server notifications for subscription management."""

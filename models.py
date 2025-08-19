@@ -1,6 +1,6 @@
 """Pydantic models for the Avra API."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Dict, List, Optional
 from datetime import datetime
 from enum import Enum
@@ -12,11 +12,53 @@ class BirthData(BaseModel):
     birth_time: str  # HH:MM format
     latitude: float
     longitude: float
+    
+    @field_validator('birth_date')
+    @classmethod
+    def birth_date_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Birth date cannot be empty')
+        return v
+        
+    @field_validator('birth_time')
+    @classmethod
+    def birth_time_must_not_be_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Birth time cannot be empty')
+        return v
+        
+    @field_validator('latitude')
+    @classmethod
+    def latitude_must_be_valid(cls, v):
+        if not -90 <= v <= 90:
+            raise ValueError('Latitude must be between -90 and 90 degrees')
+        return v
+        
+    @field_validator('longitude')
+    @classmethod
+    def longitude_must_be_valid(cls, v):
+        if not -180 <= v <= 180:
+            raise ValueError('Longitude must be between -180 and 180 degrees')
+        return v
 
 class CurrentLocation(BaseModel):
     """Current location of subject."""
     latitude: float
     longitude: float
+    
+    @field_validator('latitude')
+    @classmethod
+    def latitude_must_be_valid(cls, v):
+        if not -90 <= v <= 90:
+            raise ValueError('Latitude must be between -90 and 90 degrees')
+        return v
+        
+    @field_validator('longitude')
+    @classmethod
+    def longitude_must_be_valid(cls, v):
+        if not -180 <= v <= 180:
+            raise ValueError('Longitude must be between -180 and 180 degrees')
+        return v
 
 class PlanetPosition(BaseModel):
     """Position of a planet in the chart."""

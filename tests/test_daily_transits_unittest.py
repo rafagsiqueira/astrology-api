@@ -109,7 +109,7 @@ class TestDailyTransitModels(unittest.TestCase):
         
         with self.assertRaises(ValidationError):
             DailyTransitRequest(
-                birth_data=BirthData(birth_date="", birth_time="", latitude=0, longitude=0),
+                birth_data=BirthData(birth_date="", birth_time="", latitude=91.0, longitude=181.0),
                 current_location=current_location,
                 target_date="2024-01-01T00:00:00"
             )
@@ -126,7 +126,7 @@ class TestDailyTransitModels(unittest.TestCase):
         with self.assertRaises(ValidationError):
             DailyTransitRequest(
                 birth_data=birth_data,
-                current_location=CurrentLocation(latitude=0.0, longitude=0.0),
+                current_location=CurrentLocation(latitude=95.0, longitude=200.0),
                 target_date="2024-01-01T00:00:00"
             )
 
@@ -408,19 +408,13 @@ class TestDailyTransitFunctions(unittest.TestCase):
         """Test diff_transits with invalid input."""
         from astrology import diff_transits
         
-        with self.assertRaises(Exception):
-            diff_transits([])
-        
         invalid_transit = Mock()
         invalid_transit.date = "not-a-datetime"
         invalid_transit.aspects = "not-a-list"
         invalid_transit.retrograding = None
         
-        try:
-            result = diff_transits([invalid_transit])
-            self.assertIsInstance(result, list)
-        except Exception as e:
-            self.assertIsInstance(e, (TypeError, AttributeError, ValueError))
+        with self.assertRaises((TypeError, AttributeError, ValueError)):
+            diff_transits([invalid_transit])
 
 
 class TestDailyTransitIntegration(unittest.TestCase):

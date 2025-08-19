@@ -669,12 +669,12 @@ def build_horoscope_context(
 	"""
 	
 	system = """
-	You are an expert astrologer tasked with creating a personalized daily horoscope based on changing
+	You are an expert astrologer tasked with creating a personalized daily message based on changing
 	aspects and changes in retrograding planets. You will receive the user's birth chart and information about recent astrological
 	changes relevant to the birth chart. Your goal is to interpret this information and
-	create a meaningful, personalized horoscope for the user.
+	create a meaningful, personalized message for the user.
 
-	Interpret the data you will receive and create a horoscope:
+	Interpret the data you will receive and create a message:
 
 	1. Analyze the aspect changes:
 	- Focus on aspects that have started or ended recently (within the last few days).
@@ -689,23 +689,19 @@ def build_horoscope_context(
 	- Look for patterns or themes in the recent changes.
 	- Consider how these astrological shifts might manifest in the user's daily life.
 
-	4. Create the horoscope:
-	- Write a paragraph (3-5 sentences) that captures the overall energy or theme for the day.
-	- Focus on 2-3 specific areas of life that are likely to be influenced by the recent changes.
-	- Offer gentle advice or suggestions based on the astrological influences.
-	- Keep the tone positive and empowering, even when discussing challenges.
+	4. Consider the seasons and holidays:
+	- Important changes such as the beginning of summer, or arrival of Christmas should be relevant to your message
+
+	5. Create the message:
+	- Write a sentence that captures the overall energy or theme for the day.
+	- It should be motivational and inspiring for that day.
+	- Keep the tone positive and empowering.
 	- Use language that is accessible to a general audience, avoiding overly technical astrological
 	terms.
 
 	5. Personalization:
-	- Remember that this horoscope is personalized based on the user's birth chart, so make it feel
+	- Remember that this message is personalized based on the user's birth chart, so make it feel
 	tailored and specific.
-	- Use phrases like "You may find that..." or "This is a good time for you to..." to emphasize the
-	personal nature of the reading.
-
-	6. Closing:
-	- End with an encouraging statement or a positive affirmation related to the day's astrological
-	influences.
 
 	<formatting>
 	Output your analysis in pure text. Aim for a total length of 150-200 words.
@@ -817,7 +813,7 @@ Craft your daily motivational messages.
 			dict_change["aspect_changes"].append(f"User's {aspect.p2_name} {aspect.aspect} {aspect.p1_name} started")
 		for aspect in day.aspects.ended:
 			dict_change["aspect_changes"].append(f"User's {aspect.p2_name} {aspect.aspect} {aspect.p1_name} ended")
-		aspect_changes.append(dict)
+		aspect_changes.append(dict_change)
 
 	# Format retrograde changes as human-readable strings
 	retrograde_changes = []
@@ -827,12 +823,16 @@ Craft your daily motivational messages.
 			dict_change["retrograde_changes"].append(f"{planet} started retrograde")
 		for planet in day.retrogrades.ended:
 			dict_change["retrograde_changes"].append(f"{planet} ended retrograde")
-		retrograde_changes.append(dict)
+		retrograde_changes.append(dict_change)
+
+	# Convert to strings for template formatting
+	aspect_changes_str = str(aspect_changes) if aspect_changes else "No aspect changes"
+	retrograde_changes_str = str(retrograde_changes) if retrograde_changes else "No retrograde changes"
 
 	return (system, user.format(
 		BIRTH_DATE=birth_data.birth_date,
-		ASPECT_CHANGES=aspect_changes,
-		RETROGRADE_CHANGES=retrograde_changes
+		ASPECT_CHANGES=aspect_changes_str,
+		RETROGRADE_CHANGES=retrograde_changes_str
 	))
 
 def parse_daily_messages_response(response: str) -> list[Horoscope]:
@@ -842,7 +842,7 @@ def parse_daily_messages_response(response: str) -> list[Horoscope]:
 		response: The raw response string from Claude API.
 		
 	Returns:
-		ChartAnalysis: Parsed analysis content.
+		list[Horoscope]: Parsed horoscope messages.
 
 	Raises:
 		ValueError: If the response format is invalid or parsing fails.
@@ -850,7 +850,20 @@ def parse_daily_messages_response(response: str) -> list[Horoscope]:
 	interpolated_response = "{" + response
 	try:
 		json_data = json.loads(interpolated_response)
-		return json_data
+		
+		# Convert JSON data to list of Horoscope objects
+		horoscopes = []
+		if isinstance(json_data, dict) and 'messages' in json_data:
+			messages = json_data['messages']
+			if isinstance(messages, list):
+				for message_data in messages:
+					if isinstance(message_data, dict) and 'date' in message_data and 'message' in message_data:
+						horoscopes.append(Horoscope(
+							date=message_data['date'],
+							message=message_data['message']
+						))
+		
+		return horoscopes
 	except json.JSONDecodeError as e:
 		logger.error(f"Failed to parse daily messages: {e}")
 		raise ValueError("Invalid response format") from e
