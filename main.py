@@ -34,11 +34,6 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 # Include routes
 app.include_router(router)
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "service": "avra-backend"}
 
 if __name__ == "__main__":
     import uvicorn

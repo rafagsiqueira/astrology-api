@@ -36,6 +36,102 @@ logger = get_logger(__name__)
 # Create router
 router = APIRouter()
 
+# Health check endpoint
+@router.get("/health")
+async def health_check():
+    """Comprehensive health check endpoint that verifies all critical services."""
+    from auth import get_firebase_app, get_firestore_client
+    from config import get_claude_client, APP_VERSION, ANTHROPIC_API_KEY
+    
+    health_status = {
+        "status": "healthy",
+        "service": "avra-backend",
+        "version": APP_VERSION,
+        "services": {
+            "firebase_admin": {"status": "unknown"},
+            "firestore": {"status": "unknown"},
+            "anthropic_api": {"status": "unknown"}
+        }
+    }
+    
+    overall_healthy = True
+    
+    # Check Firebase Admin SDK
+    try:
+        import os
+        firebase_app = get_firebase_app()
+        if firebase_app:
+            # Check if proper credentials are configured
+            google_creds = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+            if not google_creds:
+                # Might be using Application Default Credentials, check if they work
+                try:
+                    # Test with a minimal Firebase Auth operation
+                    from firebase_admin import auth
+                    # This will fail if credentials are not properly set up
+                    auth.get_user_by_email("test@nonexistent.com")
+                except auth.UserNotFoundError:
+                    # This is expected - user doesn't exist, but auth is working
+                    pass
+                except Exception as cred_error:
+                    if "credential" in str(cred_error).lower() or "unauthorized" in str(cred_error).lower():
+                        health_status["services"]["firebase_admin"]["status"] = "error"
+                        health_status["services"]["firebase_admin"]["error"] = "Firebase credentials not properly configured"
+                        overall_healthy = False
+                        raise Exception("Firebase credentials not properly configured")
+            
+            health_status["services"]["firebase_admin"]["status"] = "healthy"
+        else:
+            health_status["services"]["firebase_admin"]["status"] = "unavailable"
+            health_status["services"]["firebase_admin"]["error"] = "Firebase Admin SDK not initialized"
+            overall_healthy = False
+    except Exception as e:
+        health_status["services"]["firebase_admin"]["status"] = "error"
+        health_status["services"]["firebase_admin"]["error"] = str(e)
+        overall_healthy = False
+    
+    # Check Firestore connectivity
+    try:
+        db = get_firestore_client()
+        if db:
+            # Test actual Firestore connectivity with a simple operation
+            test_collection = db.collection('health_check')
+            # This will fail if Firestore is not accessible
+            list(test_collection.limit(1).stream())
+            health_status["services"]["firestore"]["status"] = "healthy"
+        else:
+            health_status["services"]["firestore"]["status"] = "unavailable"
+            health_status["services"]["firestore"]["error"] = "Firestore client not initialized"
+            overall_healthy = False
+    except Exception as e:
+        health_status["services"]["firestore"]["status"] = "error"
+        health_status["services"]["firestore"]["error"] = str(e)
+        overall_healthy = False
+    
+    # Check Anthropic API client
+    try:
+        claude_client = get_claude_client()
+        if claude_client and ANTHROPIC_API_KEY:
+            # Test actual API connectivity with a minimal request
+            # We don't make an actual API call here to avoid costs, but verify client setup
+            health_status["services"]["anthropic_api"]["status"] = "healthy"
+        else:
+            health_status["services"]["anthropic_api"]["status"] = "unavailable"
+            health_status["services"]["anthropic_api"]["error"] = "Anthropic API key not configured"
+            overall_healthy = False
+    except Exception as e:
+        health_status["services"]["anthropic_api"]["status"] = "error"
+        health_status["services"]["anthropic_api"]["error"] = str(e)
+        overall_healthy = False
+    
+    # Set overall status
+    if not overall_healthy:
+        health_status["status"] = "unhealthy"
+        # Return 503 Service Unavailable if any critical service is down
+        raise HTTPException(status_code=503, detail=health_status)
+    
+    return health_status
+
 
 async def enhance_profile_with_chat_context(user_id: str, profile: dict, db) -> dict:
     """Enhance user profile with additional context data for chat.
