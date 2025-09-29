@@ -365,6 +365,7 @@ class DailyTransitChange(BaseModel):
 class Horoscope(BaseModel):
     date: str
     message: str
+    audioscript: str
 
 class DailyTransitResponse(BaseModel):
     """Daily transit data response."""

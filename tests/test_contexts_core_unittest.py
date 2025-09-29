@@ -7,11 +7,10 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
 from contexts import (
-    build_birth_chart_context, parse_chart_response,
+    build_birth_chart_context, build_daily_messages_context, parse_chart_response,
     build_personality_context, parse_personality_response,
     build_relationship_context, parse_relationship_response,
     build_chat_context, build_composite_context, parse_composite_response,
-    build_horoscope_context
 )
 from models import (
     AstrologicalChart, PlanetPosition, HousePosition, SignData,
@@ -439,42 +438,6 @@ class TestDailyHoroscopeContext(unittest.TestCase):
             aspects=[],
             retrograding=["Mercury"]
         )
-    
-    def test_build_horoscope_context_structure(self):
-        """Test daily horoscope context structure."""
-        from models import DailyTransitChange, TransitChanges, RetrogradeChanges
-        
-        # Create a mock birth chart
-        mock_birth_chart = AstrologicalChart(
-            planets={
-                'sun': PlanetPosition(name='Sun', sign='Gemini', house=3, degree=12.5),
-                'moon': PlanetPosition(name='Moon', sign='Pisces', house=12, degree=8.3)
-            },
-            houses={},
-            sun_sign=SignData(name='Gemini', element='Air', modality='Mutable', ruling_planet='Mercury'),
-            moon_sign=SignData(name='Pisces', element='Water', modality='Mutable', ruling_planet='Neptune'),
-            ascendant=SignData(name='Gemini', element='Air', modality='Mutable', ruling_planet='Mercury'),
-            light_svg="<svg>mock chart</svg>",
-            dark_svg='<svg>mock chart</svg>'
-        )
-        
-        # Create mock transit changes
-        mock_transit_changes = DailyTransitChange(
-            date='2024-01-15',
-            aspects=TransitChanges(began=[], ended=[]),
-            retrogrades=RetrogradeChanges(began=[], ended=[])
-        )
-        
-        system, user = build_horoscope_context(
-            birth_chart=mock_birth_chart,
-            transit_changes=mock_transit_changes
-        )
-        
-        self.assertIsInstance(system, str)
-        self.assertIsInstance(user, str)
-        self.assertIn('message', system.lower())
-        self.assertIn('astrological', system.lower())
-
 
 if __name__ == '__main__':
     unittest.main()

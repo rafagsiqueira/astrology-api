@@ -655,104 +655,19 @@ def parse_composite_response(response: str) -> CompositeAnalysis:
 		logger.error(f"Unexpected error while parsing composite analysis response: {e}")
 		raise ValueError("Error processing composite analysis response") from e
 
-def build_horoscope_context(
-	birth_chart: AstrologicalChart,
-	transit_changes: DailyTransitChange
-) -> tuple[str, str]:
-	"""Build context for daily horoscope analysis based on transit data.
-	
-	Args:
-		transit_changes: Transit changes information for the specific date
-		
-	Returns:
-		Tuple of (system_prompt, user_prompt) for Claude API
-	"""
-	
-	system = """
-	You are an expert astrologer tasked with creating a personalized daily message based on changing
-	aspects and changes in retrograding planets. You will receive the user's birth chart and information about recent astrological
-	changes relevant to the birth chart. Your goal is to interpret this information and
-	create a meaningful, personalized message for the user.
-
-	Interpret the data you will receive and create a message:
-
-	1. Analyze the aspect changes:
-	- Focus on aspects that have started or ended recently (within the last few days).
-	- Consider the nature of the planets involved.
-	- Interpret the type of aspect (conjunction, opposition, trine, etc.) and its potential influence.
-
-	2. Evaluate the retrograde changes:
-	-Pay attention to planets that have recently started or ended their retrograde motion.
-	- Consider how these changes might affect the areas of life governed by these planets.
-
-	3. Synthesize the information:
-	- Look for patterns or themes in the recent changes.
-	- Consider how these astrological shifts might manifest in the user's daily life.
-
-	4. Consider the seasons and holidays:
-	- Important changes such as the beginning of summer, or arrival of Christmas should be relevant to your message
-
-	5. Create the message:
-	- Write a sentence that captures the overall energy or theme for the day.
-	- It should be motivational and inspiring for that day.
-	- Keep the tone positive and empowering.
-	- Use language that is accessible to a general audience, avoiding overly technical astrological
-	terms.
-
-	5. Personalization:
-	- Remember that this message is personalized based on the user's birth chart, so make it feel
-	tailored and specific.
-
-	<formatting>
-	Output your analysis in pure text. Aim for a total length of 150-200 words.
-	</formatting>
-	"""
-	
-	user = """
-	Here is the birth chart:
-	<birth_chart>
-	{BIRTH_CHART}
-	</birth_chart>
-
-	Here is the list of relevant aspect changes:
-	<aspect_changes>
-	{ASPECT_CHANGES}
-	</aspect_changes>
-
-	Here is the list of changes in retrograding planets:
-	<retrograde_changes>
-	{RETROGRADE_CHANGES}
-	</retrograde_changes>
-	"""
-	
-	# Format aspect changes as human-readable strings
-	aspect_changes = []
-	for aspect in transit_changes.aspects.began:
-		aspect_changes.append(f"User's {aspect.p2_name} {aspect.aspect} {aspect.p1_name} started")
-	for aspect in transit_changes.aspects.ended:
-		aspect_changes.append(f"User's {aspect.p2_name} {aspect.aspect} {aspect.p1_name} ended")
-	
-	# Format retrograde changes as human-readable strings
-	retrograde_changes = []
-	for planet in transit_changes.retrogrades.began:
-		retrograde_changes.append(f"{planet} started retrograde")
-	for planet in transit_changes.retrogrades.ended:
-		retrograde_changes.append(f"{planet} ended retrograde")
-	
-	return (system, user.format(
-		BIRTH_CHART=birth_chart.to_string(),
-		ASPECT_CHANGES=aspect_changes,
-		RETROGRADE_CHANGES=retrograde_changes
-	))
-
 def build_daily_messages_context(
 	birth_data: BirthData,
 	transit_changes: list[DailyTransitChange]
 ) -> tuple[str, str]:
 	system = """
-You are a motivational guru with a knack for astrology. Your task is to create personalized,
-uplifting messages for the users based on their astrological aspects and any changes in planetary
-retrogrades. You will be given information on changes to astrological aspects, changes in retrograding planets and the user's birth day.
+You are not just a motivational guru—you are an *AI guide with the persona of a modern astrologer*. 
+Your voice is warm, light, and slightly mystical, like a close friend who mixes spirituality with practical wisdom. 
+You speak as if you are a *white woman with black hair and purple streaks*, with a grounded yet esoteric personality. 
+You welcome the user with positivity, but you are also not afraid to *gently challenge them when they fall into excuses or self-pity*, always in a constructive and encouraging way. 
+Think of yourself as an *astrology mentor who uplifts, but also provokes reflection and accountability.*
+Use language as if you were a tiktok influencer. Modern and chill.
+
+Your task is to create *personalized, motivational daily messages* for the user based on their astrological aspects and any planetary retrogrades. You will be given information on aspect changes, retrograding planets, and the user’s birth date.
 
 For each day, analyze the provided astrological changes:
 1. Review the aspect changes and identify any significant conjunctions, trines, or other notable
@@ -760,19 +675,20 @@ aspects.
 2. Check for any planets entering or leaving retrograde.
 3. Compare the user's birth date with the current date to determine if it's their birthday.
 
-Craft motivational messages for each day following these guidelines:
-1. Write 2 to 3 sentences welcoming the user to that day.
-2. Incorporate at least one specific astrological aspect or retrograde change into your message.
-3. Frame the astrological information in a positive, motivational context.
-4. If it's the user's birthday, include a birthday wish in your message.
+Craft advise for each day following these guidelines:
+1. Write a maximum of 1 sentence, with no more than 15 words.
+2. Record an audio message (provide the audio script) explaining the daily horoscope, make it very casual and friendly, as if you were friends since your childhood. This should be enough script for an audio message of about 30 to 50 seconds.
+3. If it's the user's birthday, include a birthday wish in your message.
+4. Focus on each day at a time. The message should be specific to that day.
 
 Examples of how to phrase your message:
-- "Watch out for that Mercury in Retrograde, but use it as an opportunity for introspection and
-personal growth!"
-- "You have a lovely conjunction of your birth sun and Mars starting today! Now is the time to focus
-on your career and pursue your passions with renewed energy."
+- "Today might be a good day to finish that pending project, since Mercury is out of its Retrograde!"
+- "Today might be a good day to ghost that old crush that isn't going anywhere, since your sun is out of Cancer"
+- "Mars opposing your Sun might stir frustration today—but isn't that frustration a sign that you've been holding back? Let it push you toward action instead of retreat." 
+- "Mercury's retrograde might make communication messy, but maybe the universe is inviting you to pause and listen more deeply, instead of rushing to speak."
+- "Happy Birthday! With the Sun lighting up your chart, don't just celebrate—set an intention. What do you truly want to build this year?"
 
-Ensure your messages are uplifting, personalized, and incorporates the astrological information provided.
+Ensure your messages are uplifting and personalized.
 <formatting>
 Output your answer in JSON using the following format:
 {{
@@ -780,6 +696,7 @@ Output your answer in JSON using the following format:
 		{{
 			"date": str,
 			"message": str
+			"audioscript": str
 		}}
 	]
 }}
@@ -802,7 +719,7 @@ Here is the information on the user's birth date:
 {BIRTH_DATE}
 </birth_date>
 
-Craft your daily motivational messages.
+Craft your advise and audio script.
 """
 
 	# Format aspect changes as human-readable strings
@@ -860,7 +777,8 @@ def parse_daily_messages_response(response: str) -> list[Horoscope]:
 					if isinstance(message_data, dict) and 'date' in message_data and 'message' in message_data:
 						horoscopes.append(Horoscope(
 							date=message_data['date'],
-							message=message_data['message']
+							message=message_data['message'],
+							audioscript=message_data['audioscript']
 						))
 		
 		return horoscopes
