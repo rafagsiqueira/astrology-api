@@ -262,6 +262,17 @@ async def load_chat_history_from_firebase(user_id: str, db) -> Optional[ChatHist
             
         # Deserialize the chat history
         chat_history_state = chat_data['chat_history_state']
+        if isinstance(chat_history_state, str):
+            try:
+                chat_history_state = json.loads(chat_history_state)
+            except json.JSONDecodeError:
+                logger.error("Stored chat history state is not valid JSON for user: %s", user_id)
+                return None
+        elif not isinstance(chat_history_state, dict):
+            logger.error("Chat history state has unexpected type (%s) for user: %s", type(chat_history_state), user_id)
+            return None
+        else:
+            chat_history_state = dict(chat_history_state)  # shallow copy so we can inject service
         
         # Recreate the ChatHistorySummarizationReducer with the service
         chat_completion = get_chat_completion_service()
