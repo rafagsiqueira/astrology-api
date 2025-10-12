@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 # Mock semantic_kernel modules before importing chat_logic
 sys.modules['semantic_kernel'] = Mock()
-sys.modules['semantic_kernel.connectors.ai.openai'] = Mock()
+sys.modules['semantic_kernel.connectors.ai.open_ai'] = Mock()
 sys.modules['semantic_kernel.contents'] = Mock()
 sys.modules['semantic_kernel.functions'] = Mock()
 
