@@ -96,10 +96,23 @@ async def require_authenticated_user(user_info: dict = Depends(verify_firebase_t
     return user_info
 
 async def require_non_anonymous_user(user_info: dict = Depends(verify_firebase_token)):
-    """Dependency that requires a non-anonymous authenticated user"""
-    # Check if user is anonymous
-    decoded_token = user_info.get('decoded_token', {})
-    firebase_sign_in_provider = decoded_token.get('firebase', {}).get('sign_in_provider')
+    """Dependency that requires a non-anonymous authenticated user."""
+    decoded_token = user_info.get('decoded_token')
+
+    if not isinstance(decoded_token, dict):
+        raise HTTPException(
+            status_code=403,
+            detail="User authentication data unavailable"
+        )
+
+    firebase_info = decoded_token.get('firebase')
+    if not isinstance(firebase_info, dict):
+        raise HTTPException(
+            status_code=403,
+            detail="User authentication data unavailable"
+        )
+
+    firebase_sign_in_provider = firebase_info.get('sign_in_provider')
     is_anonymous = firebase_sign_in_provider == 'anonymous'
     
     if is_anonymous:

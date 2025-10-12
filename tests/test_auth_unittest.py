@@ -203,8 +203,11 @@ class TestFirebaseAuthentication(unittest.TestCase):
             'email': 'test@example.com'
         }
         
-        result = asyncio.run(require_non_anonymous_user(user_info=incomplete_user))
-        self.assertEqual(result, incomplete_user)
+        with self.assertRaises(HTTPException) as cm:
+            asyncio.run(require_non_anonymous_user(user_info=incomplete_user))
+
+        self.assertEqual(cm.exception.status_code, 403)
+        self.assertIn("User authentication data unavailable", cm.exception.detail)
 
     def test_protected_endpoint_without_auth(self):
         """Test that verify_firebase_token raises exception without auth header"""

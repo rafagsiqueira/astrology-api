@@ -237,5 +237,33 @@ class TestParseChartResponse(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid response format"):
             parse_chart_response("")
 
+    def test_parse_yaml_style_response(self):
+        """Test parsing response that uses YAML-style keys (single quotes/unquoted)."""
+        payload = {
+            "sun": {"influence": "Strong leadership qualities", "traits": ["confident", "creative", "generous"]},
+            "moon": {"influence": "Emotional depth", "traits": ["intuitive", "empathetic", "reflective"]},
+            "ascendant": {"influence": "Magnetic presence", "traits": ["warm", "expressive", "bold"]},
+            "mercury": {"influence": "Quick wit", "traits": ["analytical", "communicative", "adaptable"]},
+            "venus": {"influence": "Harmonious relationships", "traits": ["affectionate", "diplomatic", "graceful"]},
+            "mars": {"influence": "Driven focus", "traits": ["assertive", "energetic", "ambitious"]},
+            "jupiter": {"influence": "Expansive vision", "traits": ["optimistic", "generous", "philosophical"]},
+            "saturn": {"influence": "Practical discipline", "traits": ["responsible", "structured", "determined"]},
+            "uranus": {"influence": "Innovative spark", "traits": ["visionary", "unconventional", "insightful"]},
+            "neptune": {"influence": "Heightened intuition", "traits": ["compassionate", "imaginative", "mystical"]},
+            "pluto": {"influence": "Deep insight", "traits": ["intense", "transformative", "powerful"]},
+        }
+
+        fragments = []
+        for key, value in payload.items():
+            influence = value["influence"]
+            traits_literal = ", ".join(f"'{trait}'" for trait in value["traits"])
+            fragments.append(
+                f"'{key}': {{'influence': '{influence}', 'traits': [{traits_literal}]}}"
+            )
+        yaml_like_response = ", ".join(fragments) + "}"
+
+        result = parse_chart_response(yaml_like_response)
+        self.assertEqual(result.sun.influence, "Strong leadership qualities")
+
 if __name__ == '__main__':
     unittest.main()

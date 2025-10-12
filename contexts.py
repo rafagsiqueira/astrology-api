@@ -3,10 +3,75 @@ from typing import Any, Dict, Optional
 from astrology import generate_birth_chart
 from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, DailyTransit, DailyTransitChange, Horoscope, HoroscopePeriod, PersonalityAnalysis, RelationshipAnalysis, CompositeAnalysis
 from config import get_logger
-from kerykeion.kr_types.kr_models import RelationshipScoreModel, TransitsTimeRangeModel   
+from kerykeion.kr_types.kr_models import RelationshipScoreModel, TransitsTimeRangeModel
 import json
+import yaml
+from pydantic import ValidationError
 
 logger = get_logger(__name__)
+
+
+def _strip_code_fence(text: str) -> str:
+    """Remove surrounding Markdown code fences if present."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        # Drop opening fence
+        without_open = stripped.split("```", 1)[1]
+        # Remove closing fence if present
+        if "```" in without_open:
+            return without_open.split("```", 1)[0].strip()
+        return without_open.strip()
+    return stripped
+
+
+def _normalize_structured_response(response: str) -> Dict[str, Any]:
+    """Convert a model response into a dictionary, handling common formatting drift."""
+    if response is None:
+        raise ValueError("Invalid response format")
+
+    cleaned = _strip_code_fence(response)
+    if not cleaned:
+        raise ValueError("Invalid response format")
+
+    stripped = cleaned.lstrip()
+    if stripped.startswith("{"):
+        candidate = stripped
+    elif stripped.startswith('"') or stripped.startswith("'"):
+        candidate = "{" + stripped
+    else:
+        brace_index = stripped.find("{")
+        if brace_index != -1:
+            candidate = stripped[brace_index:]
+        else:
+            candidate = "{" + stripped
+    candidate = candidate.strip()
+
+    # Trim anything after the last closing brace
+    last_brace = candidate.rfind("}")
+    if last_brace != -1:
+        candidate = candidate[: last_brace + 1]
+
+    # Balance braces if the model omitted trailing braces
+    open_braces = candidate.count("{")
+    close_braces = candidate.count("}")
+    if close_braces < open_braces:
+        candidate = candidate + ("}" * (open_braces - close_braces))
+
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError as json_error:
+        try:
+            parsed = yaml.safe_load(candidate)
+        except yaml.YAMLError as yaml_error:
+            logger.error("Failed to parse structured response as JSON: %s", json_error)
+            logger.debug("YAML parsing error detail: %s", yaml_error)
+            raise ValueError("Invalid response format") from json_error
+
+        if isinstance(parsed, dict):
+            return parsed
+
+        logger.error("Structured response did not resolve to an object after YAML fallback.")
+        raise ValueError("Invalid response format") from json_error
 
 def build_birth_chart_context(
 	subject: AstrologicalChart
@@ -138,13 +203,16 @@ def parse_chart_response(response: str) -> ChartAnalysis:
 	Raises:
 		ValueError: If the response format is invalid or parsing fails.
 	"""
-	interpolated_response = "{" + response
 	try:
-		json_data = json.loads(interpolated_response)
+		json_data = _normalize_structured_response(response)
+	except ValueError:
+		raise
+
+	try:
 		return ChartAnalysis(**json_data)
-	except json.JSONDecodeError as e:
-		logger.error(f"Failed to parse personality analysis response: {e}")
-		raise ValueError("Invalid response format") from e
+	except ValidationError as e:
+		logger.error(f"Validation error while parsing personality analysis response: {e}")
+		raise ValueError("Error processing personality analysis response") from e
 	except Exception as e:
 		logger.error(f"Unexpected error while parsing personality analysis response: {e}")
 		raise ValueError("Error processing personality analysis response") from e
@@ -289,13 +357,16 @@ def parse_personality_response(response: str) -> PersonalityAnalysis:
 	Raises:
 		ValueError: If the response format is invalid or parsing fails.
 	"""
-	interpolated_response = "{" + response
 	try:
-		json_data = json.loads(interpolated_response)
+		json_data = _normalize_structured_response(response)
+	except ValueError:
+		raise
+
+	try:
 		return PersonalityAnalysis(**json_data)
-	except json.JSONDecodeError as e:
-		logger.error(f"Failed to parse personality analysis response: {e}")
-		raise ValueError("Invalid response format") from e
+	except ValidationError as e:
+		logger.error(f"Validation error while parsing personality analysis response: {e}")
+		raise ValueError("Error processing personality analysis response") from e
 	except Exception as e:
 		logger.error(f"Unexpected error while parsing personality analysis response: {e}")
 		raise ValueError("Error processing personality analysis response") from e
@@ -458,13 +529,16 @@ def parse_relationship_response(response: str) -> RelationshipAnalysis:
 	Raises:
 		ValueError: If the response format is invalid or parsing fails.
 	"""
-	interpolated_response = "{" + response
 	try:
-		json_data = json.loads(interpolated_response)
+		json_data = _normalize_structured_response(response)
+	except ValueError:
+		raise
+
+	try:
 		return RelationshipAnalysis(**json_data)
-	except json.JSONDecodeError as e:
-		logger.error(f"Failed to parse personality analysis response: {e}")
-		raise ValueError("Invalid response format") from e
+	except ValidationError as e:
+		logger.error(f"Validation error while parsing personality analysis response: {e}")
+		raise ValueError("Error processing personality analysis response") from e
 	except Exception as e:
 		logger.error(f"Unexpected error while parsing personality analysis response: {e}")
 		raise ValueError("Error processing personality analysis response") from e
@@ -644,13 +718,16 @@ def parse_composite_response(response: str) -> CompositeAnalysis:
 	Raises:
 		ValueError: If the response format is invalid or parsing fails.
 	"""
-	interpolated_response = "{" + response
 	try:
-		json_data = json.loads(interpolated_response)
+		json_data = _normalize_structured_response(response)
+	except ValueError:
+		raise
+
+	try:
 		return CompositeAnalysis(**json_data)
-	except json.JSONDecodeError as e:
-		logger.error(f"Failed to parse composite analysis response: {e}")
-		raise ValueError("Invalid response format") from e
+	except ValidationError as e:
+		logger.error(f"Validation error while parsing composite analysis response: {e}")
+		raise ValueError("Error processing composite analysis response") from e
 	except Exception as e:
 		logger.error(f"Unexpected error while parsing composite analysis response: {e}")
 		raise ValueError("Error processing composite analysis response") from e
@@ -764,9 +841,8 @@ def parse_daily_messages_response(response: str) -> list[Horoscope]:
 	Raises:
 		ValueError: If the response format is invalid or parsing fails.
 	"""
-	interpolated_response = "{" + response
 	try:
-		json_data = json.loads(interpolated_response)
+		json_data = _normalize_structured_response(response)
 		
 		# Convert JSON data to list of Horoscope objects
 		horoscopes = []
@@ -782,9 +858,8 @@ def parse_daily_messages_response(response: str) -> list[Horoscope]:
 						))
 		
 		return horoscopes
-	except json.JSONDecodeError as e:
-		logger.error(f"Failed to parse daily messages: {e}")
-		raise ValueError("Invalid response format") from e
+	except ValueError:
+		raise
 	except Exception as e:
 		logger.error(f"Unexpected error while parsing daily messages response: {e}")
 		raise ValueError("Error processing daily messages response") from e

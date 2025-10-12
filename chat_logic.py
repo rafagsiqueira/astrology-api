@@ -1,5 +1,6 @@
 """Business logic for chat functionality, extracted for better testability."""
 
+import asyncio
 import json
 import re
 import nltk
@@ -19,6 +20,16 @@ from astrology import generate_transits
 from config import get_logger, OPENAI_API_KEY
 
 logger = get_logger(__name__)
+
+_PUNKT_AVAILABLE = False
+_punkt_warning_logged = False
+
+try:
+    # Check once at import; we handle fallback if unavailable
+    nltk.data.find("tokenizers/punkt")
+    _PUNKT_AVAILABLE = True
+except LookupError:
+    logger.info("NLTK 'punkt' tokenizer not found; sentence counting will use regex fallback.")
 
 # Global semantic kernel instance
 _kernel = None
@@ -216,7 +227,7 @@ async def save_chat_history_to_firebase(user_id: str, chat_history: ChatHistoryS
         
         # Store in Firebase under a single document
         chat_ref = db.collection('user_profiles').document(user_id).collection('chat_state').document('current')
-        chat_ref.set(serialized_data)
+        await asyncio.to_thread(chat_ref.set, serialized_data)
         
         logger.debug(f"Chat history saved to Firebase for user: {user_id} ({len(chat_history.messages)} messages)")
         
@@ -238,7 +249,7 @@ async def load_chat_history_from_firebase(user_id: str, db) -> Optional[ChatHist
     try:
         # Get the stored chat history state
         chat_ref = db.collection('user_profiles').document(user_id).collection('chat_state').document('current')
-        chat_doc = chat_ref.get()
+        chat_doc = await asyncio.to_thread(chat_ref.get)
         
         if not chat_doc.exists:
             logger.debug(f"No chat history found for user: {user_id}")
@@ -327,25 +338,38 @@ def create_completion_response_data(full_response: str, transit_chart=None) -> s
     return f"data: {json.dumps(response_data)}\n\n"
 
 
+def _regex_sentence_count(text: str) -> int:
+    sentences = re.split(r'[.!?]+', text)
+    return len([s for s in sentences if s.strip()])
+
+
 def count_sentences(text: str) -> int:
-    """Count the number of sentences in a given text using NLTK."""
+    """Count the number of sentences in a given text using NLTK if available."""
     if not text:
         return 0
-    try:
-        # NLTK's sentence tokenizer
-        sentences = nltk.sent_tokenize(text)
-        return len(sentences)
-    except Exception as e:
-        logger.error(f"Error tokenizing sentences: {e}")
-        # Fallback to a simple regex if NLTK fails
-        sentences = re.split(r'[.!?]+', text)
-        return len([s for s in sentences if s.strip()])
+
+    global _PUNKT_AVAILABLE, _punkt_warning_logged
+
+    if _PUNKT_AVAILABLE:
+        try:
+            sentences = nltk.sent_tokenize(text)
+            return len(sentences)
+        except LookupError:
+            _PUNKT_AVAILABLE = False
+            if not _punkt_warning_logged:
+                logger.warning("NLTK 'punkt' tokenizer unavailable at runtime; using regex fallback.")
+                _punkt_warning_logged = True
+        except Exception as e:
+            logger.error(f"Error tokenizing sentences with NLTK: {e}")
+            _PUNKT_AVAILABLE = False
+
+    return _regex_sentence_count(text)
 
 async def get_user_token_usage(user_id: str, db) -> int:
     """Get the user's token usage from Firestore."""
     try:
         doc_ref = db.collection('token_usage').document(user_id)
-        doc = await doc_ref.get()
+        doc = await asyncio.to_thread(doc_ref.get)
         if doc.exists:
             return doc.to_dict().get('token_count', 0)
         return 0
@@ -357,6 +381,7 @@ async def update_user_token_usage(user_id: str, new_tokens: int, db):
     """Update the user's token usage in Firestore."""
     try:
         doc_ref = db.collection('token_usage').document(user_id)
-        await doc_ref.set({'token_count': new_tokens}, merge=True)
+        await asyncio.to_thread(doc_ref.set, {'token_count': new_tokens}, merge=True)
     except Exception as e:
         logger.error(f"Error updating token usage for user {user_id}: {e}")
+*** End Patch
