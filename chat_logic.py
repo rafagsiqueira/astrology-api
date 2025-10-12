@@ -384,4 +384,3 @@ async def update_user_token_usage(user_id: str, new_tokens: int, db):
         await asyncio.to_thread(doc_ref.set, {'token_count': new_tokens}, merge=True)
     except Exception as e:
         logger.error(f"Error updating token usage for user {user_id}: {e}")
-*** End Patch
