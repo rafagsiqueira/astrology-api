@@ -1,8 +1,15 @@
 import unittest
 import json
 import asyncio
+import sys
 from unittest.mock import Mock, patch, AsyncMock
 from fastapi import HTTPException
+
+# Mock semantic_kernel modules before importing chat_logic
+sys.modules['semantic_kernel'] = Mock()
+sys.modules['semantic_kernel.connectors.ai.openai'] = Mock()
+sys.modules['semantic_kernel.contents'] = Mock()
+sys.modules['semantic_kernel.functions'] = Mock()
 
 from chat_logic import (
     validate_user_profile,
@@ -141,7 +148,7 @@ if __name__ == '__main__':
 class TestTokenLimiting(unittest.TestCase):
     """Test suite for token limiting functionality"""
 
-    @patch('routes.get_claude_client')
+    @patch('routes.get_openai_client')
     @patch('routes.build_chat_context')
     @patch('routes.create_chat_history_reducer')
     @patch('routes.load_chat_history_from_firebase')
@@ -153,7 +160,7 @@ class TestTokenLimiting(unittest.TestCase):
     @patch('routes.get_user_token_usage', new_callable=AsyncMock)
     @patch('routes.get_subscription_service')
     @patch('routes.validate_database_availability')
-    def test_chat_with_guru_no_subscription_under_limit(self, mock_validate_db, mock_get_sub_service, mock_get_usage, mock_update_usage, mock_get_db, mock_get_profile, mock_validate_profile, mock_enhance_profile, mock_load_history, mock_create_history, mock_build_context, mock_get_claude):
+    def test_chat_with_guru_no_subscription_under_limit(self, mock_validate_db, mock_get_sub_service, mock_get_usage, mock_update_usage, mock_get_db, mock_get_profile, mock_validate_profile, mock_enhance_profile, mock_load_history, mock_create_history, mock_build_context, mock_get_openai):
         """Test chat with no subscription and under token limit"""
         async def run_test():
             mock_get_sub_service.return_value.has_premium_access = AsyncMock(return_value=False)
@@ -171,11 +178,11 @@ class TestTokenLimiting(unittest.TestCase):
 
         asyncio.run(run_test())
 
-    @patch('routes.get_claude_client')
+    @patch('routes.get_openai_client')
     @patch('routes.get_subscription_service')
     @patch('routes.get_user_token_usage', new_callable=AsyncMock)
     @patch('routes.validate_database_availability')
-    def test_chat_with_guru_no_subscription_over_limit(self, mock_validate_db, mock_get_usage, mock_get_sub_service, mock_get_claude):
+    def test_chat_with_guru_no_subscription_over_limit(self, mock_validate_db, mock_get_usage, mock_get_sub_service, mock_get_openai):
         """Test chat with no subscription and over token limit"""
         async def run_test():
             mock_get_sub_service.return_value.has_premium_access = AsyncMock(return_value=False)
@@ -191,7 +198,7 @@ class TestTokenLimiting(unittest.TestCase):
 
         asyncio.run(run_test())
 
-    @patch('routes.get_claude_client')
+    @patch('routes.get_openai_client')
     @patch('routes.build_chat_context')
     @patch('routes.create_chat_history_reducer')
     @patch('routes.load_chat_history_from_firebase')
@@ -203,7 +210,7 @@ class TestTokenLimiting(unittest.TestCase):
     @patch('routes.get_user_token_usage', new_callable=AsyncMock)
     @patch('routes.get_subscription_service')
     @patch('routes.validate_database_availability')
-    def test_chat_with_guru_with_subscription(self, mock_validate_db, mock_get_sub_service, mock_get_usage, mock_update_usage, mock_get_db, mock_get_profile, mock_validate_profile, mock_enhance_profile, mock_load_history, mock_create_history, mock_build_context, mock_get_claude):
+    def test_chat_with_guru_with_subscription(self, mock_validate_db, mock_get_sub_service, mock_get_usage, mock_update_usage, mock_get_db, mock_get_profile, mock_validate_profile, mock_enhance_profile, mock_load_history, mock_create_history, mock_build_context, mock_get_openai):
         """Test chat with a subscription"""
         async def run_test():
             mock_get_sub_service.return_value.has_premium_access = AsyncMock(return_value=True)

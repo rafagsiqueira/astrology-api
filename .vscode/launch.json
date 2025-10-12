@@ -10,33 +10,6 @@
             "cwd": "${workspaceFolder}",
             "python": "venv/bin/python",
             "args": []
-        },
-        {
-            "name": "Backend Tests (pytest)",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "pytest",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "python": "venv/bin/python",
-            "args": [
-                "-v",
-                "${file}"
-            ],
-            "justMyCode": false
-        },
-        {
-            "name": "Backend Tests - All",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "pytest",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}",
-            "python": "venv/bin/python",
-            "args": [
-                "-v"
-            ],
-            "justMyCode": false
         }
     ]
 }

@@ -5,9 +5,16 @@ import asyncio
 
 # Mock semantic_kernel modules before any routes import
 sys.modules['semantic_kernel'] = Mock()
-sys.modules['semantic_kernel.connectors.ai.anthropic'] = Mock()
+sys.modules['semantic_kernel.connectors.ai.openai'] = Mock()
 sys.modules['semantic_kernel.contents'] = Mock()
 sys.modules['semantic_kernel.functions'] = Mock()
+
+
+class TextBlock:
+    """Simple stand-in for anthropic.types.TextBlock used in legacy tests."""
+
+    def __init__(self, text: str = ""):
+        self.text = text
 
 class TestAPIEndpoints(unittest.TestCase):
     """Test suite for API endpoint integration - focuses on API-specific logic rather than business logic"""
@@ -33,7 +40,7 @@ class TestAPIEndpoints(unittest.TestCase):
         with patch('routes.generate_birth_chart') as mock_generate:
             with patch('routes.build_birth_chart_context') as mock_build_context:
                 with patch('routes.parse_chart_response') as mock_parse_response:
-                    with patch('routes.get_claude_client') as mock_get_claude:
+                    with patch('routes.get_openai_client') as mock_get_openai:
                         mock_chart = Mock()
                         mock_chart.model_dump.return_value = {
                             'planets': {},
@@ -47,7 +54,6 @@ class TestAPIEndpoints(unittest.TestCase):
                         mock_generate.return_value = mock_chart
                         mock_build_context.return_value = ("cached_context", "user_context")
                         
-                        from anthropic.types import TextBlock
                         mock_text_block = Mock(spec=TextBlock)
                         mock_text_block.text = '"sun": {"influence": "test", "traits": []}'
                         
@@ -56,13 +62,13 @@ class TestAPIEndpoints(unittest.TestCase):
                         mock_usage.output_tokens = 50
                         
                         mock_response = Mock()
-                        mock_response.content = [mock_text_block]
+                        mock_response.output_text = '"sun": {"influence": "test", "traits": []}'
                         mock_response.usage = mock_usage
                         mock_response.stop_reason = 'end_turn'
                         
-                        mock_claude = Mock()
-                        mock_claude.messages.create.return_value = mock_response
-                        mock_get_claude.return_value = mock_claude
+                        mock_openai = Mock()
+                        mock_openai.responses.create.return_value = mock_response
+                        mock_get_openai.return_value = mock_openai
                         
                         from models import ChartAnalysis
                         mock_parsed = Mock(spec=ChartAnalysis)
@@ -90,14 +96,13 @@ class TestAPIEndpoints(unittest.TestCase):
         with patch('routes.generate_birth_chart') as mock_generate:
             with patch('routes.build_birth_chart_context') as mock_build_context:
                 with patch('routes.parse_chart_response') as mock_parse_response:
-                    with patch('routes.get_claude_client') as mock_get_claude:
+                    with patch('routes.get_openai_client') as mock_get_openai:
                         mock_chart = Mock()
                         mock_chart_data = {'planets': {}, 'houses': {}}
                         mock_chart.model_dump.return_value = mock_chart_data
                         mock_generate.return_value = mock_chart
                         mock_build_context.return_value = ("cached_context", "user_context")
                         
-                        from anthropic.types import TextBlock
                         mock_text_block = Mock(spec=TextBlock)
                         mock_text_block.text = '"sun": {"influence": "test", "traits": []}'
                         
@@ -106,13 +111,13 @@ class TestAPIEndpoints(unittest.TestCase):
                         mock_usage.output_tokens = 50
                         
                         mock_response = Mock()
-                        mock_response.content = [mock_text_block]
+                        mock_response.output_text = '"sun": {"influence": "test", "traits": []}'
                         mock_response.usage = mock_usage
                         mock_response.stop_reason = 'end_turn'
                         
-                        mock_claude = Mock()
-                        mock_claude.messages.create.return_value = mock_response
-                        mock_get_claude.return_value = mock_claude
+                        mock_openai = Mock()
+                        mock_openai.responses.create.return_value = mock_response
+                        mock_get_openai.return_value = mock_openai
                         
                         from models import ChartAnalysis
                         mock_parsed = Mock(spec=ChartAnalysis)
@@ -136,69 +141,72 @@ class TestAPIEndpoints(unittest.TestCase):
             longitude=-74.0060
         )
         
-        with patch('routes.get_claude_client', return_value=None):
+        with patch('routes.get_openai_client', return_value=None):
             with self.assertRaises(Exception):
                 asyncio.run(analyze_personality(analysis_request, {'uid': 'test'}))
         
         mock_user = {'uid': 'test-user', 'email': 'test@example.com'}
         
-        with patch('routes.get_claude_client') as mock_get_claude:
+        with patch('routes.get_openai_client') as mock_get_openai:
             with patch('contexts.generate_birth_chart') as mock_chart:
                 mock_chart_result = Mock()
                 mock_chart_result.planets = {}
                 mock_chart_result.aspects = []
                 mock_chart.return_value = mock_chart_result
                 
-                from anthropic.types import TextBlock
+                personality_payload = (
+                    '"overview": "Test overview",\n'
+                    '"personality_traits": {\n'
+                    '  "description": "Test personality traits description",\n'
+                    '  "key_traits": ["Analytical", "Creative"]\n'
+                    '},\n'
+                    '"emotional_nature": {\n'
+                    '  "description": "Test emotional nature description",\n'
+                    '  "emotional_characteristics": ["Sensitive", "Intuitive"]\n'
+                    '},\n'
+                    '"communication_and_intellect": {\n'
+                    '  "description": "Test communication description",\n'
+                    '  "communication_strengths": ["Articulate", "Thoughtful"]\n'
+                    '},\n'
+                    '"relationships_and_love": {\n'
+                    '  "description": "Test relationships description",\n'
+                    '  "relationship_dynamics": ["Loyal", "Supportive"]\n'
+                    '},\n'
+                    '"career_and_purpose": {\n'
+                    '  "description": "Test career description",\n'
+                    '  "career_potential": ["Leadership", "Innovation"]\n'
+                    '},\n'
+                    '"strengths_and_challenges": {\n'
+                    '  "strengths": ["Determination", "Creativity"],\n'
+                    '  "challenges": ["Perfectionism", "Overthinking"]\n'
+                    '},\n'
+                    '"life_path": {\n'
+                    '  "overview": "Test life path overview",\n'
+                    '  "key_development_areas": ["Self-confidence", "Communication"]\n'
+                    '}\n'
+                    '}'
+                )
+
                 mock_text_block = Mock(spec=TextBlock)
-                mock_text_block.text = '''"overview": "Test overview",
-"personality_traits": {
-  "description": "Test personality traits description",
-  "key_traits": ["Analytical", "Creative"]
-},
-"emotional_nature": {
-  "description": "Test emotional nature description",
-  "emotional_characteristics": ["Sensitive", "Intuitive"]
-},
-"communication_and_intellect": {
-  "description": "Test communication description",
-  "communication_strengths": ["Articulate", "Thoughtful"]
-},
-"relationships_and_love": {
-  "description": "Test relationships description",
-  "relationship_dynamics": ["Loyal", "Supportive"]
-},
-"career_and_purpose": {
-  "description": "Test career description",
-  "career_potential": ["Leadership", "Innovation"]
-},
-"strengths_and_challenges": {
-  "strengths": ["Determination", "Creativity"],
-  "challenges": ["Perfectionism", "Overthinking"]
-},
-"life_path": {
-  "overview": "Test life path overview",
-  "key_development_areas": ["Self-confidence", "Communication"]
-}
-}'''
+                mock_text_block.text = personality_payload
                 mock_usage = Mock()
                 mock_usage.input_tokens = 100
                 mock_usage.output_tokens = 50
                 
                 mock_response = Mock()
-                mock_response.content = [mock_text_block]
+                mock_response.output_text = personality_payload
                 mock_response.usage = mock_usage
                 mock_response.stop_reason = 'end_turn'
                 
-                mock_claude = Mock()
-                mock_claude.messages.create.return_value = mock_response
-                mock_get_claude.return_value = mock_claude
+                mock_openai = Mock()
+                mock_openai.responses.create.return_value = mock_response
+                mock_get_openai.return_value = mock_openai
                 
                 asyncio.run(analyze_personality(analysis_request, mock_user))
                 
                 mock_chart.assert_called_once()
-                mock_get_claude.assert_called_once()
-                mock_claude.messages.create.assert_called_once()
+                mock_get_openai.assert_called_once()
+                mock_openai.responses.create.assert_called_once()
 
     def test_analyze_personality_endpoint_returns_analysis(self):
         """Test that analyze_personality_endpoint returns proper analysis"""
@@ -213,12 +221,11 @@ class TestAPIEndpoints(unittest.TestCase):
         )
         user = {'uid': 'test-user-123'}
         
-        with patch('routes.get_claude_client') as mock_get_claude:
+        with patch('routes.get_openai_client') as mock_get_openai:
             with patch('routes.build_personality_context') as mock_build_context:
                 with patch('routes.parse_personality_response') as mock_parse_response:
                     mock_build_context.return_value = ("Mocked system", "Mocked user message")
                     
-                    from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
                     mock_text_block.text = '"overview": "Test analysis overview"'
                     mock_usage = Mock()
@@ -226,13 +233,13 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_usage.output_tokens = 50
                     
                     mock_response = Mock()
-                    mock_response.content = [mock_text_block]
+                    mock_response.output_text = '"overview": "Test analysis overview"'
                     mock_response.usage = mock_usage
                     mock_response.stop_reason = 'end_turn'
                     
-                    mock_claude = Mock()
-                    mock_claude.messages.create.return_value = mock_response
-                    mock_get_claude.return_value = mock_claude
+                    mock_openai = Mock()
+                    mock_openai.responses.create.return_value = mock_response
+                    mock_get_openai.return_value = mock_openai
                     
                     from models import (
                         PersonalityAnalysis, PersonalityTraitsSection, EmotionalNatureSection,
@@ -275,9 +282,9 @@ class TestAPIEndpoints(unittest.TestCase):
                     result = asyncio.run(analyze_personality(analysis_request, user))
                     
                     self.assertEqual(result, mock_analysis)
-                    mock_get_claude.assert_called_once()
+                    mock_get_openai.assert_called_once()
                     mock_build_context.assert_called_once_with(analysis_request)
-                    mock_claude.messages.create.assert_called_once()
+                    mock_openai.responses.create.assert_called_once()
                     mock_parse_response.assert_called_once_with(mock_text_block.text)
 
     def test_analyze_relationship_success(self):
@@ -305,7 +312,7 @@ class TestAPIEndpoints(unittest.TestCase):
         auth_user = {'uid': 'test-user-123'}
         
         with patch('routes.build_relationship_context') as mock_build_context:
-            with patch('routes.get_claude_client') as mock_get_claude:
+            with patch('routes.get_openai_client') as mock_get_openai:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
                     with patch('routes.create_astrological_subject') as mock_create_subject:
                         with patch('routes.RelationshipScoreFactory') as mock_score_factory:
@@ -318,19 +325,18 @@ class TestAPIEndpoints(unittest.TestCase):
                                 mock_chart.dark_svg = "<svg></svg>"
                                 mock_generate_chart.return_value = mock_chart
                                 
-                                from anthropic.types import TextBlock
                                 mock_text_block = Mock(spec=TextBlock)
-                                mock_text_block.text = "Mocked Claude response"
+                                mock_text_block.text = "Mocked OpenAI response"
                                 
                                 mock_usage = Mock()
                                 mock_usage.input_tokens = 100
                                 mock_usage.output_tokens = 50
                                 
-                                mock_claude_response = Mock()
-                                mock_claude_response.content = [mock_text_block]
-                                mock_claude_response.usage = mock_usage
-                                mock_claude_response.stop_reason = 'end_turn'
-                                mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                                mock_openai_response = Mock()
+                                mock_openai_response.output_text = "Mocked OpenAI response"
+                                mock_openai_response.usage = mock_usage
+                                mock_openai_response.stop_reason = 'end_turn'
+                                mock_get_openai.return_value.responses.create.return_value = mock_openai_response
                                 
                                 mock_parse_response.return_value = RelationshipAnalysis(
                                     score=85,
@@ -379,10 +385,10 @@ class TestAPIEndpoints(unittest.TestCase):
         auth_user = {'uid': 'test-user-123'}
         
         with patch('routes.build_relationship_context') as mock_build_context:
-            with patch('routes.get_claude_client') as mock_get_claude:
+            with patch('routes.get_openai_client') as mock_get_openai:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
                     mock_build_context.return_value = ("Mocked system", "Mocked user message")
-                    mock_get_claude.return_value = None
+                    mock_get_openai.return_value = None
                     mock_parse_response.side_effect = Exception("Structured analysis failed")
                     
                     with self.assertRaises(Exception):
@@ -413,10 +419,10 @@ class TestAPIEndpoints(unittest.TestCase):
         auth_user = {'uid': 'test-user-123'}
         
         with patch('routes.build_relationship_context') as mock_build_context:
-            with patch('routes.get_claude_client') as mock_get_claude:
+            with patch('routes.get_openai_client') as mock_get_openai:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
                     mock_build_context.return_value = ("Mocked system", "Mocked user message")
-                    mock_get_claude.return_value = None
+                    mock_get_openai.return_value = None
                     
                     mock_parse_response.return_value = RelationshipAnalysis(
                         score=60,
@@ -485,7 +491,7 @@ class TestAPIEndpoints(unittest.TestCase):
         auth_user = {'uid': 'test-user-123'}
         
         with patch('routes.build_relationship_context') as mock_build_context:
-            with patch('routes.get_claude_client') as mock_get_claude:
+            with patch('routes.get_openai_client') as mock_get_openai:
                 with patch('routes.parse_relationship_response') as mock_parse_response:
                     with patch('routes.create_astrological_subject') as mock_create_subject:
                         with patch('routes.RelationshipScoreFactory') as mock_score_factory:
@@ -497,19 +503,18 @@ class TestAPIEndpoints(unittest.TestCase):
                                 mock_chart.light_svg = "https://test.com/chart.svg"
                                 mock_generate_chart.return_value = mock_chart
                                 
-                                from anthropic.types import TextBlock
                                 mock_text_block = Mock(spec=TextBlock)
-                                mock_text_block.text = "Mocked Claude response for low score"
+                                mock_text_block.text = "Mocked OpenAI response for low score"
                                 
                                 mock_usage = Mock()
                                 mock_usage.input_tokens = 100
                                 mock_usage.output_tokens = 50
                                 
-                                mock_claude_response = Mock()
-                                mock_claude_response.content = [mock_text_block]
-                                mock_claude_response.usage = mock_usage
-                                mock_claude_response.stop_reason = 'end_turn'
-                                mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                                mock_openai_response = Mock()
+                                mock_openai_response.output_text = "Mocked OpenAI response for low score"
+                                mock_openai_response.usage = mock_usage
+                                mock_openai_response.stop_reason = 'end_turn'
+                                mock_get_openai.return_value.responses.create.return_value = mock_openai_response
                                 
                                 mock_parse_response.return_value = RelationshipAnalysis(
                                     score=35,
@@ -550,7 +555,7 @@ class TestAPIEndpoints(unittest.TestCase):
             period=HoroscopePeriod.day
         )
         auth_user = {'uid': 'test-user-123'}
-        with patch('routes.get_claude_client') as mock_get_claude:
+        with patch('routes.get_openai_client') as mock_get_openai:
             with patch('routes.generate_transits') as mock_generate:
                 with patch('routes.diff_transits') as mock_diff:
                     from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
@@ -570,7 +575,6 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_generate.return_value = [mock_daily_transit]
                     mock_diff.return_value = [mock_transit_change]
 
-                    from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
                     mock_text_block.text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
 
@@ -578,11 +582,11 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_usage.input_tokens = 100
                     mock_usage.output_tokens = 50
 
-                    mock_claude_response = Mock()
-                    mock_claude_response.content = [mock_text_block]
-                    mock_claude_response.usage = mock_usage
-                    mock_claude_response.stop_reason = 'end_turn'
-                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                    mock_openai_response = Mock()
+                    mock_openai_response.output_text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
+                    mock_openai_response.usage = mock_usage
+                    mock_openai_response.stop_reason = 'end_turn'
+                    mock_get_openai.return_value.responses.create.return_value = mock_openai_response
                     
                     result = asyncio.run(get_daily_transits(request, auth_user))
                     
@@ -704,7 +708,7 @@ class TestAPIEndpoints(unittest.TestCase):
             period=HoroscopePeriod.week
         )
         auth_user = {'uid': 'test-user-123'}
-        with patch('routes.get_claude_client') as mock_get_claude:
+        with patch('routes.get_openai_client') as mock_get_openai:
             with patch('routes.generate_transits') as mock_generate:
                 with patch('routes.diff_transits') as mock_diff:
                     from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
@@ -729,7 +733,6 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_generate.return_value = mock_transits
                     mock_diff.return_value = mock_changes
 
-                    from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
                     mock_text_block.text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
 
@@ -737,11 +740,11 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_usage.input_tokens = 100
                     mock_usage.output_tokens = 50
 
-                    mock_claude_response = Mock()
-                    mock_claude_response.content = [mock_text_block]
-                    mock_claude_response.usage = mock_usage
-                    mock_claude_response.stop_reason = 'end_turn'
-                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                    mock_openai_response = Mock()
+                    mock_openai_response.output_text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
+                    mock_openai_response.usage = mock_usage
+                    mock_openai_response.stop_reason = 'end_turn'
+                    mock_get_openai.return_value.responses.create.return_value = mock_openai_response
                     
                     result = asyncio.run(get_daily_transits(request, auth_user))
                     
@@ -778,7 +781,7 @@ class TestAPIEndpoints(unittest.TestCase):
         )
         auth_user = {'uid': 'test-user-123'}
         
-        with patch('routes.get_claude_client') as mock_get_claude:
+        with patch('routes.get_openai_client') as mock_get_openai:
             with patch('routes.generate_transits') as mock_generate:
                 with patch('routes.diff_transits') as mock_diff:
                     from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
@@ -797,7 +800,6 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_generate.return_value = mock_transits
                     mock_diff.return_value = mock_changes
 
-                    from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
                     mock_text_block.text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
 
@@ -805,11 +807,11 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_usage.input_tokens = 100
                     mock_usage.output_tokens = 50
 
-                    mock_claude_response = Mock()
-                    mock_claude_response.content = [mock_text_block]
-                    mock_claude_response.usage = mock_usage
-                    mock_claude_response.stop_reason = 'end_turn'
-                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                    mock_openai_response = Mock()
+                    mock_openai_response.output_text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
+                    mock_openai_response.usage = mock_usage
+                    mock_openai_response.stop_reason = 'end_turn'
+                    mock_get_openai.return_value.responses.create.return_value = mock_openai_response
                     
                     result = asyncio.run(get_daily_transits(request, auth_user))
                     
@@ -876,7 +878,7 @@ class TestAPIEndpoints(unittest.TestCase):
             'name': 'Test User'
         }
         
-        with patch('routes.get_claude_client') as mock_get_claude:
+        with patch('routes.get_openai_client') as mock_get_openai:
             with patch('routes.generate_transits') as mock_generate:
                 with patch('routes.diff_transits') as mock_diff:
                     from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
@@ -894,7 +896,6 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_generate.return_value = [mock_transit]
                     mock_diff.return_value = [mock_change]
 
-                    from anthropic.types import TextBlock
                     mock_text_block = Mock(spec=TextBlock)
                     mock_text_block.text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
 
@@ -902,11 +903,11 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_usage.input_tokens = 100
                     mock_usage.output_tokens = 50
 
-                    mock_claude_response = Mock()
-                    mock_claude_response.content = [mock_text_block]
-                    mock_claude_response.usage = mock_usage
-                    mock_claude_response.stop_reason = 'end_turn'
-                    mock_get_claude.return_value.messages.create.return_value = mock_claude_response
+                    mock_openai_response = Mock()
+                    mock_openai_response.output_text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
+                    mock_openai_response.usage = mock_usage
+                    mock_openai_response.stop_reason = 'end_turn'
+                    mock_get_openai.return_value.responses.create.return_value = mock_openai_response
                     
                     result = asyncio.run(get_daily_transits(request, auth_user))
                     

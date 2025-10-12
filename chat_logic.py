@@ -5,19 +5,18 @@ import re
 import nltk
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from datetime import datetime
-from anthropic import Anthropic
 from fastapi import HTTPException
 
 # Semantic Kernel imports
 from semantic_kernel import Kernel
-from semantic_kernel.connectors.ai.anthropic import AnthropicChatCompletion
+from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
 from semantic_kernel.contents import ChatHistory, ChatMessageContent, AuthorRole
 from semantic_kernel.contents import ChatHistorySummarizationReducer
 from semantic_kernel.functions import kernel_function
 
 from models import CurrentLocation, BirthData, HoroscopePeriod
 from astrology import generate_transits
-from config import get_logger, ANTHROPIC_API_KEY
+from config import get_logger, OPENAI_API_KEY
 
 logger = get_logger(__name__)
 
@@ -27,7 +26,7 @@ _chat_completion_service = None
 
 
 class AstrologyPlugin:
-    """Plugin providing astrological tools for Claude."""
+    """Plugin providing astrological tools for the chat model."""
     
     def __init__(self, user_birth_data: BirthData, current_location: CurrentLocation):
         self.user_birth_data = user_birth_data
@@ -66,26 +65,26 @@ def get_semantic_kernel() -> Kernel:
         # Initialize the kernel
         _kernel = Kernel()
         
-        # Add Anthropic chat completion service
-        if ANTHROPIC_API_KEY:
-            _chat_completion_service = AnthropicChatCompletion(
-                service_id="anthropic_chat",
-                api_key=ANTHROPIC_API_KEY,
-                ai_model_id="claude-3-5-sonnet-20241022"
+        # Add OpenAI chat completion service
+        if OPENAI_API_KEY:
+            _chat_completion_service = OpenAIChatCompletion(
+                service_id="openai_chat",
+                api_key=OPENAI_API_KEY,
+                ai_model_id="gpt-4o-mini"
             )
             _kernel.add_service(_chat_completion_service)
-            
+
             # Note: We use ChatHistorySummarizationReducer for conversation management
             # instead of the ConversationSummaryPlugin
-            
-            logger.debug("Semantic kernel initialized with Anthropic service")
+
+            logger.debug("Semantic kernel initialized with OpenAI service")
         else:
-            raise ValueError("ANTHROPIC_API_KEY not found - cannot initialize semantic kernel")
-    
+            raise ValueError("OPENAI_API_KEY not found - cannot initialize semantic kernel")
+
     return _kernel
 
 
-def get_chat_completion_service() -> AnthropicChatCompletion:
+def get_chat_completion_service() -> OpenAIChatCompletion:
     """Get the chat completion service."""
     global _chat_completion_service
     
@@ -99,18 +98,17 @@ def get_chat_completion_service() -> AnthropicChatCompletion:
 
 
 def create_chat_history_reducer() -> ChatHistorySummarizationReducer:
-    """Create a ChatHistorySummarizationReducer configured for Claude's token limits.
-    
+    """Create a ChatHistorySummarizationReducer configured for GPT-4o mini's token limits.
+
     Returns:
         ChatHistorySummarizationReducer configured for optimal token management
     """
     chat_completion = get_chat_completion_service()
-    
-    # Claude 3.5 Sonnet has a 200k token context window
-    # We'll use 150k to leave room for system messages and response
+
+    # GPT-4o mini supports a large context window; keep a conservative limit
     return ChatHistorySummarizationReducer(
         service=chat_completion,
-        target_count=150000,  # Conservative limit for Claude 3.5 Sonnet
+        target_count=120000,
         auto_reduce=True,
         threshold_count=10000
     )
@@ -268,28 +266,22 @@ async def load_chat_history_from_firebase(user_id: str, db) -> Optional[ChatHist
         return None
 
 
-def validate_claude_client(claude_client) -> Anthropic:
-    """Validate that Claude client is available.
-    
-    Args:
-        claude_client: The Claude API client instance
-        
-    Raises:
-        HTTPException: If Claude client is not available
-    """
-    if not claude_client:
+def validate_model_client(model_client) -> object:
+    """Validate that the chat model client is available."""
+
+    if not model_client:
         raise HTTPException(
-            status_code=503, 
-            detail="Chat service not available - Claude API not configured"
+            status_code=503,
+            detail="Chat service not available - OpenAI API not configured"
         )
-    return claude_client
+    return model_client
 
 
 def create_streaming_response_data(text_chunk: str) -> str:
     """Create SSE-formatted data chunk for streaming response.
     
     Args:
-        text_chunk: Text chunk from Claude streaming response
+        text_chunk: Text chunk from the streaming response
         
     Returns:
         SSE-formatted data string

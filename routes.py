@@ -1,6 +1,6 @@
 """API routes for the Avra application."""
 
-import anthropic
+import openai
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from kerykeion.relationship_score import RelationshipScoreFactory
@@ -13,7 +13,7 @@ from analytics_service import get_analytics_service
 from appstore_notifications import get_notification_handler
 from astrology import create_astrological_subject, create_astrological_subject, generate_birth_chart, generate_composite_chart, generate_transits, diff_transits
 
-from config import get_logger, get_claude_client
+from config import get_logger, get_openai_client, OPENAI_API_KEY
 from auth import verify_firebase_token, get_firestore_client, validate_database_availability
 from models import (
     BirthData, AstrologicalChart, Horoscope, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
@@ -24,6 +24,8 @@ from chat_logic import (
     validate_user_profile,
     load_chat_history_from_firebase,
     create_chat_history_reducer,
+    create_streaming_response_data,
+    create_error_response_data,
     count_sentences,
     get_user_token_usage,
     update_user_token_usage
@@ -40,7 +42,7 @@ router = APIRouter()
 async def health_check():
     """Comprehensive health check endpoint that verifies all critical services."""
     from auth import get_firebase_app, get_firestore_client
-    from config import get_claude_client, APP_VERSION, ANTHROPIC_API_KEY
+    from config import get_openai_client, APP_VERSION, OPENAI_API_KEY
     
     health_status = {
         "status": "healthy",
@@ -49,7 +51,7 @@ async def health_check():
         "services": {
             "firebase_admin": {"status": "unknown"},
             "firestore": {"status": "unknown"},
-            "anthropic_api": {"status": "unknown"}
+            "openai_api": {"status": "unknown"}
         }
     }
     
@@ -64,9 +66,8 @@ async def health_check():
             google_creds = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
             if not google_creds:
                 # Might be using Application Default Credentials, check if they work
-                try:
-                    # Test with a minimal Firebase Auth operation
-                    from firebase_admin import auth
+                from firebase_admin import auth
+                try:                    
                     # This will fail if credentials are not properly set up
                     auth.get_user_by_email("test@nonexistent.com")
                 except auth.UserNotFoundError:
@@ -107,20 +108,20 @@ async def health_check():
         health_status["services"]["firestore"]["error"] = str(e)
         overall_healthy = False
     
-    # Check Anthropic API client
+    # Check OpenAI API client
     try:
-        claude_client = get_claude_client()
-        if claude_client and ANTHROPIC_API_KEY:
+        openai_client = get_openai_client()
+        if openai_client and OPENAI_API_KEY:
             # Test actual API connectivity with a minimal request
             # We don't make an actual API call here to avoid costs, but verify client setup
-            health_status["services"]["anthropic_api"]["status"] = "healthy"
+            health_status["services"]["openai_api"]["status"] = "healthy"
         else:
-            health_status["services"]["anthropic_api"]["status"] = "unavailable"
-            health_status["services"]["anthropic_api"]["error"] = "Anthropic API key not configured"
+            health_status["services"]["openai_api"]["status"] = "unavailable"
+            health_status["services"]["openai_api"]["error"] = "OpenAI API key not configured"
             overall_healthy = False
     except Exception as e:
-        health_status["services"]["anthropic_api"]["status"] = "error"
-        health_status["services"]["anthropic_api"]["error"] = str(e)
+        health_status["services"]["openai_api"]["status"] = "error"
+        health_status["services"]["openai_api"]["error"] = str(e)
         overall_healthy = False
     
     # Set overall status
@@ -213,71 +214,79 @@ async def enhance_profile_with_chat_context(user_id: str, profile: dict, db) -> 
     return profile
 
 
-def assert_stop_reason_end_turn(response):
-    """Assert that the Claude API response has stop_reason 'end_turn'.
-    
-    Raises:
-        HTTPException: If stop_reason is not 'end_turn'
-    """
-    if hasattr(response, 'stop_reason') and response.stop_reason != 'end_turn':
-        logger.error(f"Claude API response had unexpected stop_reason: {response.stop_reason}")
-        raise HTTPException(
-            status_code=502, 
-            detail=f"AI response incomplete (stop_reason: {response.stop_reason}). Please try again."
-        )
-    elif not hasattr(response, 'stop_reason'):
-        logger.warning("Claude API response missing stop_reason attribute")
+def _get_usage_value(usage, attribute: str) -> int:
+    """Safely extract usage values from OpenAI response objects."""
 
-def assert_end_turn(response):
-    """Alias for assert_stop_reason_end_turn for backward compatibility."""
-    assert_stop_reason_end_turn(response)
+    if usage is None:
+        return 0
 
-async def call_claude_with_analytics(claude_client, endpoint_name: str, user_id: str, **claude_kwargs):
-    """Wrapper for Claude API calls that tracks 429 errors and token usage to Google Analytics.
-    
-    Args:
-        claude_client: The Claude API client
-        endpoint_name: Name of the endpoint for tracking (e.g., "generate-chart")
-        user_id: User ID for analytics
-        **claude_kwargs: Arguments to pass to claude_client.messages.create()
-        
-    Returns:
-        Claude API response
-        
-    Raises:
-        HTTPException: For various error conditions including 429
-    """
+    if hasattr(usage, attribute):
+        return getattr(usage, attribute) or 0
+
+    if isinstance(usage, dict):
+        return usage.get(attribute, 0) or 0
+
+    return 0
+
+
+def extract_response_text(response) -> str:
+    """Extract plain text content from an OpenAI Responses API response."""
+
+    if hasattr(response, "output_text") and response.output_text:
+        return response.output_text
+
+    if hasattr(response, "output"):
+        texts = []
+        for item in getattr(response, "output", []):
+            for content in getattr(item, "content", []):
+                text = getattr(content, "text", None)
+                if text:
+                    texts.append(text)
+        if texts:
+            return "".join(texts)
+
+    raise ValueError("No text content found in OpenAI response")
+
+
+async def call_openai_with_analytics(openai_client, endpoint_name: str, user_id: str, **openai_kwargs):
+    """Wrapper for OpenAI Responses API calls that tracks rate limits and token usage."""
+
     try:
-        response = claude_client.messages.create(**claude_kwargs)
-        
-        # Track token usage on successful response
-        if hasattr(response, 'usage') and response.usage:
+        response = openai_client.responses.create(**openai_kwargs)
+
+        usage = getattr(response, "usage", None)
+        if usage:
             analytics = get_analytics_service()
-            await analytics.track_claude_token_usage(
+            await analytics.track_model_token_usage(
                 endpoint=endpoint_name,
-                input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens,
+                input_tokens=_get_usage_value(usage, "input_tokens"),
+                output_tokens=_get_usage_value(usage, "output_tokens"),
                 user_id=user_id
             )
-            logger.debug(f"Token usage tracked for {endpoint_name}: {response.usage.input_tokens} in, {response.usage.output_tokens} out")
-        
+            logger.debug(
+                "Token usage tracked for %s: %s in, %s out",
+                endpoint_name,
+                _get_usage_value(usage, "input_tokens"),
+                _get_usage_value(usage, "output_tokens")
+            )
+
         return response
-    except anthropic.RateLimitError as e:
-        # Track the 429 rate limit error to Google Analytics
+    except openai.RateLimitError as exc:
         analytics = get_analytics_service()
-        await analytics.track_claude_rate_limit(endpoint_name, user_id)
-        logger.warning(f"Claude rate limit (429) tracked for endpoint {endpoint_name}, user {user_id}")
-        
-        # Re-raise as HTTPException
-        raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
-    except anthropic.APIError as e:
-        # Handle other Anthropic API errors
-        logger.error(f"Claude API error on {endpoint_name}: {e}")
-        raise HTTPException(status_code=503, detail="Claude API service temporarily unavailable")
-    except Exception as e:
-        # Handle unexpected errors
-        logger.error(f"Unexpected error calling Claude API on {endpoint_name}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        await analytics.track_model_rate_limit(endpoint_name, user_id)
+        logger.warning(
+            "OpenAI rate limit (429) tracked for endpoint %s, user %s: %s",
+            endpoint_name,
+            user_id,
+            exc
+        )
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.") from exc
+    except openai.APIError as exc:
+        logger.error(f"OpenAI API error on {endpoint_name}: {exc}")
+        raise HTTPException(status_code=503, detail="OpenAI API service temporarily unavailable") from exc
+    except Exception as exc:
+        logger.error(f"Unexpected error calling OpenAI on {endpoint_name}: {exc}")
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 @router.get("/")
 async def root():
@@ -292,8 +301,8 @@ async def generate_chart_endpoint(
     """Generate an astrological chart from birth data."""
     logger.debug(f"Received birth data: {birth_data}")
     
-    claude_client = get_claude_client()
-    if not claude_client:
+    openai_client = get_openai_client()
+    if not openai_client:
         raise HTTPException(status_code=503, detail="Personality analysis service not available")
     
     try:
@@ -303,38 +312,25 @@ async def generate_chart_endpoint(
 
         (system, user_message) = build_birth_chart_context(chart)
 
-        # Call Claude API with rendered prompt and analytics tracking
-        response = await call_claude_with_analytics(
-            claude_client=claude_client,
+        # Call OpenAI API with rendered prompt and analytics tracking
+        response = await call_openai_with_analytics(
+            openai_client=openai_client,
             endpoint_name="generate-chart",
             user_id=user['uid'],
-            model="claude-3-5-haiku-latest",
-            max_tokens=2048,
-            system=[
-                {
-                    "type": "text",
-                    "text": system,
-                    "cache_control": {"type": "ephemeral"}
-                }
-            ],
-            messages=[
+            model="gpt-4o-mini",
+            max_output_tokens=2048,
+            input=[
+                {"role": "system", "content": system},
                 {"role": "user", "content": user_message},
                 {"role": "assistant", "content": "{"}
             ]
         )
 
-        assert_end_turn(response)
-        
-        # Parse response - cast to TextBlock to access text attribute
-        from anthropic.types import TextBlock
-        text_block = response.content[0]
-        if isinstance(text_block, TextBlock):
-            analysis = parse_chart_response(text_block.text)
-            logger.debug("Chart generation completed successfully")
-            chart.analysis = analysis
-            return chart
-        else:
-            raise ValueError(f"Expected TextBlock, got {type(text_block)}")
+        analysis_text = extract_response_text(response)
+        analysis = parse_chart_response(analysis_text)
+        logger.debug("Chart generation completed successfully")
+        chart.analysis = analysis
+        return chart
     except Exception as e:
         logger.error(f"Error generating chart: {e}")
         logger.error(traceback.format_exc())
@@ -348,44 +344,31 @@ async def analyze_personality(
     """Analyze personality based on astrological chart."""
     logger.debug(f"Analyzing personality for user: {user['uid']}")
 
-    claude_client = get_claude_client()
-    if not claude_client:
+    openai_client = get_openai_client()
+    if not openai_client:
         raise HTTPException(status_code=503, detail="Personality analysis service not available")
     
     try:
         (system, user_message) = build_personality_context(request)
         
-        # Call Claude API with rendered prompt and analytics tracking
-        response = await call_claude_with_analytics(
-            claude_client=claude_client,
+        # Call OpenAI API with rendered prompt and analytics tracking
+        response = await call_openai_with_analytics(
+            openai_client=openai_client,
             endpoint_name="analyze-personality",
             user_id=user['uid'],
-            model="claude-3-5-haiku-latest",
-            max_tokens=2048,
-            system=[
-                {
-                    "type": "text",
-                    "text": system,
-                    "cache_control": {"type": "ephemeral"}
-                }
-            ],
-            messages=[
+            model="gpt-4o-mini",
+            max_output_tokens=2048,
+            input=[
+                {"role": "system", "content": system},
                 {"role": "user", "content": user_message},
                 {"role": "assistant", "content": "{"}
             ]
         )
 
-        assert_end_turn(response)
-        
-        # Parse response - cast to TextBlock to access text attribute
-        from anthropic.types import TextBlock
-        text_block = response.content[0]
-        if isinstance(text_block, TextBlock):
-            analysis = parse_personality_response(text_block.text)
-            logger.debug("Personality analysis completed successfully")
-            return analysis
-        else:
-            raise ValueError(f"Expected TextBlock, got {type(text_block)}")
+        analysis_text = extract_response_text(response)
+        analysis = parse_personality_response(analysis_text)
+        logger.debug("Personality analysis completed successfully")
+        return analysis
         
     except Exception as e:
         logger.error(f"Error analyzing personality: {e}")
@@ -400,8 +383,8 @@ async def analyze_relationship(
     """Analyze relationship compatibility between two people using synastry."""
     logger.debug(f"Relationship analysis request from user: {user['uid']}")
 
-    claude_client = get_claude_client()
-    if not claude_client:
+    openai_client = get_openai_client()
+    if not openai_client:
         raise HTTPException(status_code=503, detail="Analysis service not available")
     
     try:
@@ -421,44 +404,31 @@ async def analyze_relationship(
             relationship_type=request.relationship_type
         )
 
-        # Call Claude API with rendered prompt and analytics tracking
-        response = await call_claude_with_analytics(
-            claude_client=claude_client,
-            endpoint_name="analyze-relationship", 
+        # Call OpenAI API with rendered prompt and analytics tracking
+        response = await call_openai_with_analytics(
+            openai_client=openai_client,
+            endpoint_name="analyze-relationship",
             user_id=user['uid'],
-            model="claude-3-5-haiku-latest",
-            max_tokens=2048,
-            system=[
-                {
-                    "type": "text",
-                    "text": system,
-                    "cache_control": {"type": "ephemeral"}
-                }
-            ],           
-            messages=[
+            model="gpt-4o-mini",
+            max_output_tokens=2048,
+            input=[
+                {"role": "system", "content": system},
                 {"role": "user", "content": user_message},
                 {"role": "assistant", "content": "{"}
             ]
         )
 
-        assert_end_turn(response)
+        analysis_text = extract_response_text(response)
+        analysis = parse_relationship_response(analysis_text)
 
-        # Parse response - cast to TextBlock to access text attribute
-        from anthropic.types import TextBlock
-        text_block = response.content[0]
-        if isinstance(text_block, TextBlock):
-            analysis = parse_relationship_response(text_block.text)
-            
-            # Add the chart URLs to the analysis response
-            analysis.person1_light = birth_chart_1.light_svg
-            analysis.person1_dark = birth_chart_1.dark_svg
-            analysis.person2_light = birth_chart_2.light_svg
-            analysis.person2_dark = birth_chart_2.dark_svg
-            
-            logger.debug("Relationship analysis completed successfully")
-            return analysis
-        else:
-            raise ValueError(f"Expected TextBlock, got {type(text_block)}")
+        # Add the chart URLs to the analysis response
+        analysis.person1_light = birth_chart_1.light_svg
+        analysis.person1_dark = birth_chart_1.dark_svg
+        analysis.person2_light = birth_chart_2.light_svg
+        analysis.person2_dark = birth_chart_2.dark_svg
+
+        logger.debug("Relationship analysis completed successfully")
+        return analysis
     except Exception as e:
         logger.error(f"Error analyzing relationship: {e}")
         logger.error(traceback.format_exc())
@@ -472,52 +442,36 @@ async def analyze_composite(
     """Analyze composite chart between two people using midpoint method."""
     logger.debug(f"Composite analysis request from user: {user['uid']}")
 
-    claude_client = get_claude_client()
-    if not claude_client:
+    openai_client = get_openai_client()
+    if not openai_client:
         raise HTTPException(status_code=503, detail="Analysis service not available")
     
     try:
         # Generate composite chart with SVG
         composite_chart = generate_composite_chart(request, with_svg=True)
         
-        # Build context for Claude analysis
+        # Build context for OpenAI analysis
         (system, user_message) = build_composite_context(composite_chart)
 
-        # Call Claude API with rendered prompt and analytics tracking
-        response = await call_claude_with_analytics(
-            claude_client=claude_client,
-            endpoint_name="analyze-composite", 
+        # Call OpenAI API with rendered prompt and analytics tracking
+        response = await call_openai_with_analytics(
+            openai_client=openai_client,
+            endpoint_name="analyze-composite",
             user_id=user['uid'],
-            model="claude-3-5-haiku-latest",
-            max_tokens=2048,
-            system=[
-                {
-                    "type": "text",
-                    "text": system,
-                    "cache_control": {"type": "ephemeral"}
-                }
-            ],           
-            messages=[
+            model="gpt-4o-mini",
+            max_output_tokens=2048,
+            input=[
+                {"role": "system", "content": system},
                 {"role": "user", "content": user_message},
                 {"role": "assistant", "content": "{"}
             ]
         )
 
-        assert_end_turn(response)
-        
-        # Parse response - cast to TextBlock to access text attribute
-        from anthropic.types import TextBlock
-        text_block = response.content[0]
-        if isinstance(text_block, TextBlock):
-            analysis = parse_composite_response(text_block.text)
-            
-            # Add the chart SVG URL to the analysis response
-            # analysis.chart_svg_url = composite_chart.chartImageUrl
-            
-            logger.debug("Composite analysis completed successfully")
-            return analysis
-        else:
-            raise ValueError(f"Expected TextBlock, got {type(text_block)}")
+        analysis_text = extract_response_text(response)
+        analysis = parse_composite_response(analysis_text)
+
+        logger.debug("Composite analysis completed successfully")
+        return analysis
     except Exception as e:
         logger.error(f"Error analyzing composite: {e}")
         logger.error(traceback.format_exc())
@@ -550,8 +504,8 @@ async def chat_with_guru(
     """Chat with Avra."""
     logger.debug(f"Chat request from user: {user['uid']}")
 
-    claude_client = get_claude_client()
-    if not claude_client:
+    openai_client = get_openai_client()
+    if not openai_client:
         raise HTTPException(status_code=503, detail="Analysis service not available")
     
     # Get database connection
@@ -599,37 +553,40 @@ async def chat_with_guru(
         
         async def generate_streaming_response():
             full_response = ""
+            final_usage = None
             try:
-                with claude_client.messages.stream(
-                    max_tokens=2048,
-                    system=[
-                        {
-                            "type": "text",
-                            "text": system,
-                            "cache_control": {"type": "ephemeral"}
-                        }
-                    ],
-                    messages=[
-                    {
-                        "role": "user", 
-                        "content": chat_history.to_prompt()
-                    },
-                    {
-                        "role": "user",
-                        "content": user_context
-                    },
-                    {
-                        "role": "user",
-                        "content": request.message
-                    }
-                    ],
-                    model="claude-opus-4-1-20250805",
+                with openai_client.responses.stream(
+                    model="gpt-4o-mini",
+                    max_output_tokens=2048,
+                    input=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": chat_history.to_prompt()},
+                        {"role": "user", "content": user_context},
+                        {"role": "user", "content": request.message}
+                    ]
                 ) as stream:
-                    for text in stream.text_stream:
-                        full_response += text
-                        # Format as Server-Sent Events
-                        yield f"data: {json.dumps({'type': 'text_delta', 'data': {'delta': text}})}\n\n"
-                
+                    for event in stream:
+                        if event.type == "response.output_text.delta":
+                            text = getattr(event, "delta", "")
+                            if text:
+                                full_response += text
+                                yield create_streaming_response_data(text)
+                        elif event.type == "response.error":
+                            error_message = getattr(event, "message", "OpenAI streaming error")
+                            logger.error(f"OpenAI streaming error: {error_message}")
+                            yield create_error_response_data(error_message)
+                    final_response = stream.get_final_response()
+                    final_usage = getattr(final_response, "usage", None)
+
+                if final_usage:
+                    analytics = get_analytics_service()
+                    await analytics.track_model_token_usage(
+                        endpoint="chat",
+                        input_tokens=_get_usage_value(final_usage, "input_tokens"),
+                        output_tokens=_get_usage_value(final_usage, "output_tokens"),
+                        user_id=user['uid']
+                    )
+
                 # Save the complete conversation to chat history
                 if full_response:
                     from semantic_kernel.contents import ChatMessageContent, AuthorRole
@@ -641,20 +598,26 @@ async def chat_with_guru(
                         role=AuthorRole.ASSISTANT,
                         content=full_response
                     )
-                    
+
                     chat_history.add_message(user_message)
                     chat_history.add_message(assistant_message)
-                    
+
                     # Save to Firebase
                     from chat_logic import save_chat_history_to_firebase
                     await save_chat_history_to_firebase(user['uid'], chat_history, db)
-                
+
                 # Send completion signal
                 yield f"data: {json.dumps({'type': 'message_stop'})}\n\n"
-                
+
+            except openai.RateLimitError as exc:
+                analytics = get_analytics_service()
+                await analytics.track_model_rate_limit("chat", user['uid'])
+                error_message = "Rate limit exceeded. Please try again later."
+                logger.error(f"OpenAI rate limit during streaming: {exc}")
+                yield create_error_response_data(error_message)
             except Exception as e:
                 logger.error(f"Error in chat streaming: {e}")
-                yield f"data: {json.dumps({'type': 'error', 'data': {'message': str(e)}})}\n\n"
+                yield create_error_response_data(str(e))
 
         return StreamingResponse(
             generate_streaming_response(),
@@ -682,9 +645,9 @@ async def get_daily_transits(
     
     try:
 
-        # Validate Claude client
-        claude_client = get_claude_client()
-        if not claude_client:
+        # Validate OpenAI client
+        openai_client = get_openai_client()
+        if not openai_client:
             raise HTTPException(status_code=503, detail="Horoscope generation service not available")
         
         # Parse target date
@@ -703,42 +666,28 @@ async def get_daily_transits(
 
         (system_prompt, user_prompt) = build_daily_messages_context(request.birth_data, changes)
 
-        logger.debug("Calling Claude API for horoscope generation")
-        
-        # Call Claude API with analytics tracking
-        response = await call_claude_with_analytics(
-            claude_client=claude_client,
+        logger.debug("Calling OpenAI API for horoscope generation")
+
+        # Call OpenAI API with analytics tracking
+        response = await call_openai_with_analytics(
+            openai_client=openai_client,
             endpoint_name="generate-horoscope",
             user_id=user['uid'],
-            model="claude-3-5-haiku-latest",
-            max_tokens=1000,
+            model="gpt-4o-mini",
+            max_output_tokens=1000,
             temperature=0.7,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_prompt,
-                    # "cache_control": {"type": "ephemeral"}
-                }
-            ],
-            messages=[
-                {
-                    "role": "user", 
-                    "content": user_prompt
-                },
+            input=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
                 {"role": "assistant", "content": "{"}
             ]
         )
 
-        assert_end_turn(response)
-
         daily_transit_response = DailyTransitResponse(transits=transits, changes=changes, messages=None)
         
-        # Parse response - cast to TextBlock to access text attribute
-        from anthropic.types import TextBlock
-        text_block = response.content[0]
-        if isinstance(text_block, TextBlock):
-            messages: list[Horoscope] = parse_daily_messages_response(text_block.text)
-            daily_transit_response.messages = messages
+        messages_text = extract_response_text(response)
+        messages: list[Horoscope] = parse_daily_messages_response(messages_text)
+        daily_transit_response.messages = messages
         
         logger.debug(f"Daily transit data generated successfully: {len(transits)} transits")
         return daily_transit_response
@@ -778,4 +727,3 @@ async def handle_appstore_notifications(request: dict):
         logger.error(error_msg)
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=error_msg)
-

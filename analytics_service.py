@@ -69,17 +69,17 @@ class GoogleAnalyticsService:
             logger.error(f"Error tracking event {event_name}: {e}")
             return False
     
-    async def track_api_failure(self, 
-                               endpoint: str, 
-                               error_code: int, 
-                               error_type: str = "api_error",
+    async def track_api_failure(self,
+                               endpoint: str,
+                               error_code: int,
+                               error_type: str = "model_api_error",
                                user_id: Optional[str] = None) -> bool:
         """Track API failure events to Google Analytics.
         
         Args:
             endpoint: The API endpoint that failed
             error_code: HTTP error code (e.g., 529)
-            error_type: Type of error (e.g., "claude_overloaded", "api_error")
+            error_type: Type of error (e.g., "model_overloaded", "model_api_error")
             user_id: Optional user ID for tracking
             
         Returns:
@@ -96,10 +96,10 @@ class GoogleAnalyticsService:
         
         return await self.track_event("api_failure", client_id, parameters)
     
-    async def track_claude_rate_limit(self, 
-                                      endpoint: str,
-                                      user_id: Optional[str] = None) -> bool:
-        """Specifically track Claude 429 rate limiting errors.
+    async def track_model_rate_limit(self,
+                                     endpoint: str,
+                                     user_id: Optional[str] = None) -> bool:
+        """Track 429 rate limiting errors reported by the LLM provider.
         
         Args:
             endpoint: The API endpoint that experienced the rate limit
@@ -111,16 +111,16 @@ class GoogleAnalyticsService:
         return await self.track_api_failure(
             endpoint=endpoint,
             error_code=429,
-            error_type="claude_rate_limited",
+            error_type="model_rate_limited",
             user_id=user_id
         )
-    
-    async def track_claude_token_usage(self,
+
+    async def track_model_token_usage(self,
                                       endpoint: str,
                                       input_tokens: int,
                                       output_tokens: int,
                                       user_id: Optional[str] = None) -> bool:
-        """Track Claude API token usage metrics.
+        """Track token usage metrics for model invocations.
         
         Args:
             endpoint: The API endpoint that was called
@@ -141,7 +141,7 @@ class GoogleAnalyticsService:
             "timestamp": asyncio.get_event_loop().time()
         }
         
-        return await self.track_event("claude_token_usage", client_id, parameters)
+        return await self.track_event("model_token_usage", client_id, parameters)
 
 
 # Global instance
