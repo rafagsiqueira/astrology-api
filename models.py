@@ -362,16 +362,42 @@ class DailyTransitChange(BaseModel):
     aspects: TransitChanges
     retrogrades: RetrogradeChanges
 
+class ForecastLocation(BaseModel):
+    """User-selected location used for weather forecasts."""
+    city_name: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
+
+
 class Horoscope(BaseModel):
     date: str
     message: str
     audioscript: str
+    message_id: Optional[str] = None
+    audio_path: Optional[str] = None
+    audio_format: Optional[str] = None  # e.g., "mp3"
+    voice: Optional[str] = None
+
+
+class DailyWeatherForecast(BaseModel):
+    """Daily weather forecast information from WeatherKit."""
+    date: Optional[str]
+    condition_code: Optional[str]
+    symbol_name: Optional[str] = None
+    max_temperature_c: Optional[float] = None
+    min_temperature_c: Optional[float] = None
+    precipitation_chance: Optional[float] = None
+    forecast_summary: Optional[str] = None
 
 class DailyTransitResponse(BaseModel):
     """Daily transit data response."""
     transits: list[DailyTransit]
     changes: list[DailyTransitChange]
     messages: Optional[list[Horoscope]]
+    weather: Optional[list[DailyWeatherForecast]] = None
+    forecast_location: Optional[ForecastLocation] = None
 
 class DailyHoroscopeRequest(BaseModel):
     """Request for daily horoscope analysis."""

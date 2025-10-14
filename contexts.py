@@ -1,7 +1,8 @@
 from typing import Any, Dict, Optional
+import uuid
 
 from astrology import generate_birth_chart
-from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, DailyTransit, DailyTransitChange, Horoscope, HoroscopePeriod, PersonalityAnalysis, RelationshipAnalysis, CompositeAnalysis
+from models import AnalysisRequest, AstrologicalChart, BirthData, ChartAnalysis, DailyTransit, DailyTransitChange, Horoscope, HoroscopePeriod, PersonalityAnalysis, RelationshipAnalysis, CompositeAnalysis, DailyWeatherForecast
 from config import get_logger
 from kerykeion.kr_types.kr_models import RelationshipScoreModel, TransitsTimeRangeModel
 import json
@@ -9,6 +10,42 @@ import yaml
 from pydantic import ValidationError
 
 logger = get_logger(__name__)
+
+
+def _coerce_string_list(value: Any) -> list[str]:
+    """Ensure the value is converted into a list of user-friendly strings."""
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            if isinstance(item, str):
+                result.append(item)
+            elif isinstance(item, (int, float)):
+                result.append(str(item))
+            elif isinstance(item, dict):
+                parts = []
+                for key, val in item.items():
+                    if val is None:
+                        continue
+                    if isinstance(val, list):
+                        val = ", ".join(str(x) for x in val if x is not None)
+                    elif isinstance(val, dict):
+                        val = ", ".join(f"{sub_key}: {sub_val}" for sub_key, sub_val in val.items())
+                    parts.append(f"{key}: {val}")
+                if parts:
+                    result.append("; ".join(parts))
+            else:
+                result.append(str(item))
+        return result
+
+    if isinstance(value, (str, int, float)):
+        return [str(value)]
+
+    return []
 
 
 def _strip_code_fence(text: str) -> str:
@@ -535,7 +572,24 @@ def parse_relationship_response(response: str) -> RelationshipAnalysis:
 		raise
 
 	try:
-		return RelationshipAnalysis(**json_data)
+		normalized_data = dict(json_data)
+		for field in (
+			'relationship_aspects',
+			'strengths',
+			'challenges',
+			'areas_for_growth'
+		):
+			if field in normalized_data:
+				normalized_data[field] = _coerce_string_list(normalized_data.get(field))
+
+		if 'score' in normalized_data and not isinstance(normalized_data['score'], int):
+			try:
+				normalized_data['score'] = int(normalized_data['score'])
+			except (TypeError, ValueError):
+				logger.warning("Unable to coerce relationship score to int; defaulting to 0")
+				normalized_data['score'] = 0
+
+		return RelationshipAnalysis(**normalized_data)
 	except ValidationError as e:
 		logger.error(f"Validation error while parsing personality analysis response: {e}")
 		raise ValueError("Error processing personality analysis response") from e
@@ -734,7 +788,8 @@ def parse_composite_response(response: str) -> CompositeAnalysis:
 
 def build_daily_messages_context(
 	birth_data: BirthData,
-	transit_changes: list[DailyTransitChange]
+	transit_changes: list[DailyTransitChange],
+	weather_forecasts: Optional[list[DailyWeatherForecast]] = None
 ) -> tuple[str, str]:
 	system = """
 You are not just a motivational guru—you are an *AI guide with the persona of a modern astrologer*. 
@@ -749,8 +804,9 @@ Your task is to create *personalized, motivational daily messages* for the user 
 For each day, analyze the provided astrological changes:
 1. Review the aspect changes and identify any significant conjunctions, trines, or other notable
 aspects.
-2. Check for any planets entering or leaving retrograde.
-3. Compare the user's birth date with the current date to determine if it's their birthday.
+2. Incorporate the weather forecast into your reasoning. Weather also has an effect in our daily humor and energy levels.
+3. Check for any planets entering or leaving retrograde.
+4. Compare the user's birth date with the current date to determine if it's their birthday.
 
 Craft advise for each day following these guidelines:
 1. Write a maximum of 1 sentence, with no more than 15 words.
@@ -759,11 +815,11 @@ Craft advise for each day following these guidelines:
 4. Focus on each day at a time. The message should be specific to that day.
 
 Examples of how to phrase your message:
-- "Today might be a good day to finish that pending project, since Mercury is out of its Retrograde!"
+- "Today might be a good day to finish that pending project, since Mercury is out of its Retrograde! All the sunlight will give you the energy you need."
 - "Today might be a good day to ghost that old crush that isn't going anywhere, since your sun is out of Cancer"
 - "Mars opposing your Sun might stir frustration today—but isn't that frustration a sign that you've been holding back? Let it push you toward action instead of retreat." 
 - "Mercury's retrograde might make communication messy, but maybe the universe is inviting you to pause and listen more deeply, instead of rushing to speak."
-- "Happy Birthday! With the Sun lighting up your chart, don't just celebrate—set an intention. What do you truly want to build this year?"
+- "Happy Birthday! With the Sun lighting up your chart and your day, don't just celebrate—set an intention. What do you truly want to build this year?"
 
 Ensure your messages are uplifting and personalized.
 <formatting>
@@ -790,6 +846,11 @@ Here is the information on the changes to retrograding planets:
 <retrograde_changes>
 {RETROGRADE_CHANGES}
 </retrograde_changes>
+
+Here is the information on the weather forecast:
+<weather_forecast>
+{WEATHER_FORECAST}
+</weather_forecast>
 
 Here is the information on the user's birth date:
 <birth_date>
@@ -822,11 +883,38 @@ Craft your advise and audio script.
 	# Convert to strings for template formatting
 	aspect_changes_str = str(aspect_changes) if aspect_changes else "No aspect changes"
 	retrograde_changes_str = str(retrograde_changes) if retrograde_changes else "No retrograde changes"
+	weather_summary = "No weather data available."
+	if weather_forecasts:
+		weather_entries = []
+		for forecast in weather_forecasts:
+			if isinstance(forecast, DailyWeatherForecast):
+				data = forecast.model_dump()
+			elif isinstance(forecast, dict):
+				data = forecast
+			else:
+				continue
+
+			entry = {
+				"date": data.get("date"),
+				"condition": data.get("condition_code"),
+				"symbol": data.get("symbol_name"),
+				"summary": data.get("forecast_summary"),
+				"max_c": data.get("max_temperature_c"),
+				"min_c": data.get("min_temperature_c"),
+				"precipitation_chance": data.get("precipitation_chance"),
+			}
+			weather_entries.append(entry)
+		if weather_entries:
+			try:
+				weather_summary = json.dumps(weather_entries)
+			except TypeError:
+				weather_summary = str(weather_entries)
 
 	return (system, user.format(
 		BIRTH_DATE=birth_data.birth_date,
 		ASPECT_CHANGES=aspect_changes_str,
-		RETROGRADE_CHANGES=retrograde_changes_str
+		RETROGRADE_CHANGES=retrograde_changes_str,
+		WEATHER_FORECAST=weather_summary
 	))
 
 def parse_daily_messages_response(response: str) -> list[Horoscope]:
@@ -845,16 +933,20 @@ def parse_daily_messages_response(response: str) -> list[Horoscope]:
 		json_data = _normalize_structured_response(response)
 		
 		# Convert JSON data to list of Horoscope objects
-		horoscopes = []
+		horoscopes: list[Horoscope] = []
 		if isinstance(json_data, dict) and 'messages' in json_data:
 			messages = json_data['messages']
 			if isinstance(messages, list):
 				for message_data in messages:
 					if isinstance(message_data, dict) and 'date' in message_data and 'message' in message_data:
+						message_id = message_data.get('id') or message_data.get('message_id')
+						if not message_id:
+							message_id = str(uuid.uuid4())
 						horoscopes.append(Horoscope(
 							date=message_data['date'],
 							message=message_data['message'],
-							audioscript=message_data['audioscript']
+							audioscript=message_data.get('audioscript') or message_data.get('message', ''),
+							message_id=message_id
 						))
 		
 		return horoscopes

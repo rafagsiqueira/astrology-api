@@ -1,7 +1,6 @@
 """Core authentication tests - organized and comprehensive."""
 
 import asyncio
-import pytest
 import unittest
 from unittest.mock import Mock, patch
 from fastapi import HTTPException
@@ -81,7 +80,7 @@ class TestFirebaseTokenVerification(unittest.TestCase):
         """Test verification with missing authorization header."""
         async def run_test():
             with self.assertRaises(HTTPException) as context:
-                await verify_firebase_token(authorization=None)
+                await verify_firebase_token(authorization='')
             self.assertEqual(context.exception.status_code, 401)
 
         asyncio.run(run_test())

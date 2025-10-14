@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock, MagicMock
 import sys
 import asyncio
 
@@ -18,6 +18,51 @@ class TextBlock:
 
 class TestAPIEndpoints(unittest.TestCase):
     """Test suite for API endpoint integration - focuses on API-specific logic rather than business logic"""
+
+    def setUp(self):
+        self.weather_patcher = patch('routes.fetch_daily_weather_forecast', return_value=[])
+        self.mock_weather = self.weather_patcher.start()
+
+        async def immediate_to_thread(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        self.to_thread_patcher = patch('routes.asyncio.to_thread', side_effect=immediate_to_thread)
+        self.mock_to_thread = self.to_thread_patcher.start()
+
+        self.pref_location_patcher = patch('routes._get_preferred_forecast_location', return_value=None)
+        self.mock_pref_location = self.pref_location_patcher.start()
+
+        self.cached_transits_patcher = patch('routes._load_cached_transits', return_value={})
+        self.mock_cached_transits = self.cached_transits_patcher.start()
+
+        self.store_transit_patcher = patch('routes._store_transit_document')
+        self.mock_store_transit = self.store_transit_patcher.start()
+
+        self.validate_db_patcher = patch('routes.validate_database_availability', return_value=None)
+        self.mock_validate_db = self.validate_db_patcher.start()
+
+        self.firestore_client_patcher = patch('routes.get_firestore_client', return_value=Mock())
+        self.mock_firestore_client = self.firestore_client_patcher.start()
+
+        self.weather_range_patcher = patch('routes._fetch_weather_range', new=AsyncMock(return_value={}))
+        self.mock_weather_range = self.weather_range_patcher.start()
+
+        self.generate_tts_patcher = patch(
+            'routes.generate_tts_audio',
+            return_value=('daily_transits/test-user-123/2024-01-01/message.mp3', 'mp3'),
+        )
+        self.mock_generate_tts = self.generate_tts_patcher.start()
+
+    def tearDown(self):
+        self.weather_patcher.stop()
+        self.to_thread_patcher.stop()
+        self.pref_location_patcher.stop()
+        self.cached_transits_patcher.stop()
+        self.store_transit_patcher.stop()
+        self.validate_db_patcher.stop()
+        self.firestore_client_patcher.stop()
+        self.weather_range_patcher.stop()
+        self.generate_tts_patcher.stop()
 
     def test_root_endpoint(self):
         """Test the root health check endpoint"""
@@ -586,14 +631,38 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_openai_response.output_text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
                     mock_openai_response.usage = mock_usage
                     mock_openai_response.stop_reason = 'end_turn'
-                    mock_get_openai.return_value.responses.create.return_value = mock_openai_response
-                    
+                    mock_client = mock_get_openai.return_value
+                    mock_client.responses.create.return_value = mock_openai_response
+
+                    mock_stream = MagicMock()
+                    mock_stream.__enter__.return_value = mock_stream
+                    mock_stream.iter_bytes.return_value = [b"fake-binary-audio"]
+                    mock_audio = Mock()
+                    mock_audio.with_streaming_response.create.return_value = mock_stream
+                    mock_client.audio = Mock(speech=mock_audio)
+
+                    self.mock_weather_range.return_value = {
+                        "2024-01-01": {
+                            "date": "2024-01-01",
+                            "condition_code": "Clear",
+                            "symbol_name": "sun.max",
+                            "max_temperature_c": 24.0,
+                            "min_temperature_c": 15.0,
+                            "precipitation_chance": 0.1,
+                            "forecast_summary": "Sunny and bright."
+                        }
+                    }
+
                     result = asyncio.run(get_daily_transits(request, auth_user))
-                    
+
                     self.assertEqual(result.transits, [mock_daily_transit])
                     self.assertEqual(result.changes, [mock_transit_change])
+                    self.assertIsNotNone(result.weather)
+                    self.assertTrue(result.messages)
+                    self.assertTrue(result.messages[0].audio_path)
                     mock_generate.assert_called_once()
                     mock_diff.assert_called_once_with([mock_daily_transit])
+                    self.mock_generate_tts.assert_called()
 
     def test_get_daily_transits_invalid_date(self):
         """Test daily transits with invalid date format"""
@@ -745,7 +814,20 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_openai_response.usage = mock_usage
                     mock_openai_response.stop_reason = 'end_turn'
                     mock_get_openai.return_value.responses.create.return_value = mock_openai_response
-                    
+
+                    self.mock_weather_range.return_value = {
+                        f"2024-01-{i+1:02d}": {
+                            "date": f"2024-01-{i+1:02d}",
+                            "condition_code": "Clear",
+                            "symbol_name": "sun.max",
+                            "max_temperature_c": 20.0 + i,
+                            "min_temperature_c": 10.0 + i,
+                            "precipitation_chance": 0.05,
+                            "forecast_summary": "Sunny"
+                        }
+                        for i in range(30)
+                    }
+
                     result = asyncio.run(get_daily_transits(request, auth_user))
                     
                     self.assertEqual(len(result.transits), 7)
@@ -823,6 +905,7 @@ class TestAPIEndpoints(unittest.TestCase):
                         start_date=mock_generate.call_args[1]['start_date'],
                         period=HoroscopePeriod.month
                 )
+                    self.mock_generate_tts.assert_called()
 
     def test_get_daily_transits_unauthenticated_user(self):
         """Test daily transits endpoint with unauthenticated user"""

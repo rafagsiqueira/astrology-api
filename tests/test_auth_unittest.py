@@ -13,7 +13,7 @@ class TestFirebaseAuthentication(unittest.TestCase):
         from auth import verify_firebase_token
         
         with self.assertRaises(HTTPException) as cm:
-            asyncio.run(verify_firebase_token(authorization=None))
+            asyncio.run(verify_firebase_token(authorization=''))
         
         self.assertEqual(cm.exception.status_code, 401)
         self.assertIn("Authorization header missing", cm.exception.detail)
@@ -214,7 +214,7 @@ class TestFirebaseAuthentication(unittest.TestCase):
         from auth import verify_firebase_token
         
         with self.assertRaises(HTTPException) as cm:
-            asyncio.run(verify_firebase_token(authorization=None))
+            asyncio.run(verify_firebase_token(authorization=''))
         
         self.assertEqual(cm.exception.status_code, 401)
         self.assertIn("Authorization header missing", cm.exception.detail)
@@ -318,7 +318,7 @@ class TestFirebaseAuthentication(unittest.TestCase):
         from auth import verify_firebase_token
         
         with self.assertRaises(HTTPException) as cm:
-            asyncio.run(verify_firebase_token(authorization=None))
+            asyncio.run(verify_firebase_token(authorization=''))
         
         self.assertEqual(cm.exception.status_code, 401)
         self.assertIn("Authorization header missing", cm.exception.detail)

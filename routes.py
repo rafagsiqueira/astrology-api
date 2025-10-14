@@ -1,24 +1,66 @@
 """API routes for the Avra application."""
 
-import openai
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import StreamingResponse
-from kerykeion.relationship_score import RelationshipScoreFactory
-from datetime import datetime
+import asyncio
+import hashlib
 import json
 import traceback
-from contexts import build_birth_chart_context, build_chat_context, build_daily_messages_context, build_personality_context, build_relationship_context, build_composite_context, parse_chart_response, parse_daily_messages_response, parse_personality_response, parse_relationship_response, parse_composite_response
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional, cast
+
+import openai
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from firebase_admin import firestore as firebase_firestore
+from kerykeion.relationship_score import RelationshipScoreFactory
+from pydantic import ValidationError
+
+from contexts import (
+    build_birth_chart_context,
+    build_chat_context,
+    build_daily_messages_context,
+    build_personality_context,
+    build_relationship_context,
+    build_composite_context,
+    parse_chart_response,
+    parse_daily_messages_response,
+    parse_personality_response,
+    parse_relationship_response,
+    parse_composite_response,
+)
 from profile_cache import cache, get_user_profile_cached
 from analytics_service import get_analytics_service
 from appstore_notifications import get_notification_handler
-from astrology import create_astrological_subject, create_astrological_subject, generate_birth_chart, generate_composite_chart, generate_transits, diff_transits
+from astrology import (
+    create_astrological_subject,
+    generate_birth_chart,
+    generate_composite_chart,
+    generate_transits,
+    diff_transits,
+)
 
-from config import get_logger, get_openai_client, OPENAI_API_KEY
-from auth import verify_firebase_token, get_firestore_client, validate_database_availability
+from config import OPENAI_API_KEY, get_logger, get_openai_client
+from tts_service import generate_tts_audio
+from auth import get_firestore_client, validate_database_availability, verify_firebase_token
 from models import (
-    BirthData, AstrologicalChart, Horoscope, PersonalityAnalysis, AnalysisRequest, ChatRequest, RelationshipAnalysis,
-    RelationshipAnalysisRequest, CompositeAnalysisRequest, CompositeAnalysis,
-    DailyTransitRequest, DailyTransitResponse
+    AnalysisRequest,
+    AstrologicalChart,
+    BirthData,
+    CurrentLocation,
+    DailyTransitRequest,
+    DailyTransitResponse,
+    DailyWeatherForecast,
+    Horoscope,
+    PersonalityAnalysis,
+    ChatRequest,
+    RelationshipAnalysis,
+    RelationshipAnalysisRequest,
+    CompositeAnalysisRequest,
+    CompositeAnalysis,
+    ForecastLocation,
+    DailyTransit,
+    DailyTransitChange,
+    HoroscopePeriod,
 )
 from chat_logic import (
     validate_user_profile,
@@ -31,11 +73,225 @@ from chat_logic import (
     update_user_token_usage
 )
 from subscription_service import get_subscription_service
+from weatherkit_service import fetch_daily_weather_forecast, WeatherKitConfigurationError
 
 logger = get_logger(__name__)
 
 # Create router
 router = APIRouter()
+
+
+def _compute_location_hash(latitude: float, longitude: float) -> str:
+    """Create a short, stable hash for a latitude/longitude pair."""
+    normalized = f"{round(latitude, 4)}:{round(longitude, 4)}"
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def _normalize_city_key(city_name: str) -> str:
+    """Create a stable slug identifier for a city name."""
+    slug = "".join(c.lower() if c.isalnum() else "-" for c in city_name.strip())
+    slug = "-".join(filter(None, slug.split("-")))
+    return slug or "unknown-city"
+
+
+def _get_preferred_forecast_location(firestore_client, uid: str) -> Optional[ForecastLocation]:
+    """Fetch the user's preferred forecast location from Firestore."""
+    try:
+        user_doc = firestore_client.collection("user_profiles").document(uid).get()
+        if not user_doc.exists:
+            return None
+        data = user_doc.to_dict() or {}
+        preference = data.get("preferred_forecast_location")
+        if not isinstance(preference, dict):
+            return None
+        city_name = preference.get("city_name")
+        if not city_name:
+            return None
+        latitude = preference.get("latitude")
+        longitude = preference.get("longitude")
+        kwargs = {
+            "city_name": str(city_name),
+            "region": preference.get("region"),
+            "country": preference.get("country"),
+        }
+        if latitude is not None:
+            kwargs["latitude"] = float(latitude)
+        if longitude is not None:
+            kwargs["longitude"] = float(longitude)
+        return ForecastLocation(**kwargs)
+    except Exception as firestore_error:  # pragma: no cover - best effort
+        logger.error("Failed to load preferred forecast location: %s", firestore_error)
+        return None
+
+
+def _date_key(value: datetime) -> str:
+    return value.strftime("%Y-%m-%d")
+def _load_cached_transits(
+    firestore_client,
+    uid: str,
+    date_keys: list[str],
+    location_key: str,
+) -> dict[str, dict]:
+    """Load cached transit documents for the given user/date/location."""
+    results: dict[str, dict] = {}
+    collection = (
+        firestore_client.collection("user_profiles")
+        .document(uid)
+        .collection("daily_transits")
+    )
+
+    for date_key in date_keys:
+        doc_id = f"{date_key}_{location_key}"
+        try:
+            snapshot = collection.document(doc_id).get()
+        except Exception as firestore_error:  # pragma: no cover - defensive
+            logger.error("Failed to load cached transit for %s: %s", doc_id, firestore_error)
+            continue
+
+        if not snapshot.exists:
+            continue
+
+        data = snapshot.to_dict() or {}
+        try:
+            transit_data = data.get("transit_data")
+            change_data = data.get("change_data")
+            messages_data = data.get("horoscope_messages") or []
+            weather_data = data.get("weather")
+            forecast_loc_data = data.get("forecast_location")
+
+            transit = DailyTransit.model_validate(transit_data) if transit_data else None
+            change = (
+                DailyTransitChange.model_validate(change_data)
+                if change_data
+                else None
+            )
+            messages = []
+            for msg in messages_data:
+                if not isinstance(msg, dict):
+                    continue
+                if "audio_path" not in msg and "audio_url" in msg:
+                    msg = {**msg, "audio_path": msg.get("audio_url")}
+                messages.append(Horoscope.model_validate(msg))
+            weather = (
+                DailyWeatherForecast.model_validate(weather_data)
+                if weather_data
+                else None
+            )
+            forecast_location = (
+                ForecastLocation.model_validate(forecast_loc_data)
+                if forecast_loc_data
+                else None
+            )
+
+            if transit is None:
+                continue
+
+            results[date_key] = {
+                "transit": transit,
+                "change": change,
+                "messages": messages,
+                "weather": weather,
+                "forecast_location": forecast_location,
+            }
+        except ValidationError as validation_error:
+            logger.warning(
+                "Failed to validate cached transit for %s: %s",
+                doc_id,
+                validation_error,
+            )
+        except Exception as unexpected_error:  # pragma: no cover - defensive
+            logger.error(
+                "Unexpected error loading cached transit for %s: %s",
+                doc_id,
+                unexpected_error,
+            )
+
+    return results
+
+
+def _store_transit_document(
+    firestore_client,
+    uid: str,
+    date_key: str,
+    location_key: str,
+    transit: DailyTransit,
+    change: Optional[DailyTransitChange],
+    messages: Optional[list[Horoscope]],
+    weather: Optional[DailyWeatherForecast],
+    forecast_location: Optional[ForecastLocation],
+) -> None:
+    """Persist a transit document to Firestore."""
+    collection = (
+        firestore_client.collection("user_profiles")
+        .document(uid)
+        .collection("daily_transits")
+    )
+    doc_id = f"{date_key}_{location_key}"
+    doc_ref = collection.document(doc_id)
+
+    try:
+        payload = {
+            "date": date_key,
+            "location_key": location_key,
+            "transit_data": transit.model_dump(mode="json"),
+            "cached_at": firebase_firestore.SERVER_TIMESTAMP,
+        }
+        if change is not None:
+            payload["change_data"] = change.model_dump(mode="json")
+        if messages:
+            payload["horoscope_messages"] = [
+                msg.model_dump(mode="json", exclude_none=True) for msg in messages
+            ]
+        if weather is not None:
+            payload["weather"] = weather.model_dump(mode="json")
+        if forecast_location is not None:
+            payload["forecast_location"] = forecast_location.model_dump(
+                mode="json", exclude_none=True
+            )
+
+        doc_ref.set(payload)
+    except Exception as firestore_error:  # pragma: no cover - defensive
+        logger.error(
+            "Failed to store transit document %s: %s", doc_id, firestore_error
+        )
+
+
+async def _fetch_weather_range(
+    latitude: float,
+    longitude: float,
+    start_date: datetime,
+    days: int,
+) -> dict[str, DailyWeatherForecast]:
+    """Fetch weather forecasts for a latitude/longitude without caching."""
+    if days <= 0:
+        return {}
+
+    forecast_start = start_date
+    forecast_end = start_date + timedelta(days=max(days - 1, 0))
+    results: dict[str, DailyWeatherForecast] = {}
+
+    try:
+        raw_forecasts = await fetch_daily_weather_forecast(
+            latitude=latitude,
+            longitude=longitude,
+            start_date=forecast_start,
+            end_date=forecast_end,
+        )
+        for entry in raw_forecasts:
+            try:
+                forecast = DailyWeatherForecast(**entry)
+            except Exception as validation_error:
+                logger.warning("Skipping malformed WeatherKit entry: %s", validation_error)
+                continue
+            if forecast.date:
+                results[forecast.date] = forecast
+    except WeatherKitConfigurationError as config_error:
+        logger.warning("WeatherKit configuration missing: %s", config_error)
+    except Exception as weather_error:
+        logger.error("Failed to fetch WeatherKit forecast: %s", weather_error)
+
+    return results
+
 
 # Health check endpoint
 @router.get("/health")
@@ -641,61 +897,276 @@ async def get_daily_transits(
     user: dict = Depends(verify_firebase_token)
 ):
     """Get transit data for a specific date."""
-    logger.debug(f"Daily transit request from user: {user['uid']} for date: {request.target_date}")
-    
+    logger.debug(
+        "Daily transit request from user: %s for date: %s",
+        user["uid"],
+        request.target_date,
+    )
+
     try:
+        validate_database_availability()
+        firestore_client = get_firestore_client()
+        if firestore_client is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Firestore service unavailable",
+            )
 
-        # Validate OpenAI client
-        openai_client = get_openai_client()
-        if not openai_client:
-            raise HTTPException(status_code=503, detail="Horoscope generation service not available")
-        
-        # Parse target date
-        target_date = datetime.fromisoformat(request.target_date)
-        
-        # Generate transits for period days starting from target date
-        transits = generate_transits(
-            birth_data=request.birth_data,
-            current_location=request.current_location,
-            start_date=target_date,
-            period=request.period
+        # Resolve effective location from user preference or request payload.
+        preferred_location = _get_preferred_forecast_location(
+            firestore_client, user["uid"]
         )
-        
-        # Generate transit changes (diff)
-        changes = diff_transits(transits)
+        effective_latitude = preferred_location.latitude if preferred_location and preferred_location.latitude is not None else request.current_location.latitude
+        effective_longitude = preferred_location.longitude if preferred_location and preferred_location.longitude is not None else request.current_location.longitude
+        effective_city = preferred_location.city_name if preferred_location else None
 
-        (system_prompt, user_prompt) = build_daily_messages_context(request.birth_data, changes)
+        location_key = (
+            _normalize_city_key(effective_city)
+            if effective_city
+            else _compute_location_hash(effective_latitude, effective_longitude)
+        )
 
-        logger.debug("Calling OpenAI API for horoscope generation")
+        # Determine requested period length.
+        try:
+            target_date = datetime.fromisoformat(request.target_date)
+        except ValueError as parse_error:
+            raise HTTPException(status_code=400, detail="Invalid target date") from parse_error
 
-        # Call OpenAI API with analytics tracking
-        response = await call_openai_with_analytics(
-            openai_client=openai_client,
-            endpoint_name="generate-horoscope",
-            user_id=user['uid'],
-            model="gpt-4o-mini",
-            max_output_tokens=1000,
-            temperature=0.7,
-            input=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-                {"role": "assistant", "content": "{"}
+        if request.period == HoroscopePeriod.day:
+            period_days = 1
+        elif request.period == HoroscopePeriod.week:
+            period_days = 7
+        elif request.period == HoroscopePeriod.month:
+            period_days = 30
+        elif request.period == HoroscopePeriod.year:
+            period_days = 365
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported period")
+
+        date_keys = [_date_key(target_date + timedelta(days=i)) for i in range(period_days)]
+
+        cached_transits = _load_cached_transits(
+            firestore_client,
+            user["uid"],
+            date_keys,
+            location_key,
+        )
+
+        # Fetch weather forecasts for the requested range.
+        weather_forecasts_raw = await _fetch_weather_range(
+            effective_latitude,
+            effective_longitude,
+            target_date,
+            period_days,
+        )
+
+        weather_forecasts_map: dict[str, DailyWeatherForecast] = {}
+        for key, value in weather_forecasts_raw.items():
+            if isinstance(value, DailyWeatherForecast):
+                weather_forecasts_map[key] = value
+            elif isinstance(value, dict):
+                try:
+                    weather_forecasts_map[key] = DailyWeatherForecast.model_validate(value)
+                except ValidationError:
+                    continue
+            else:
+                continue
+
+        missing_dates = [date_key for date_key in date_keys if date_key not in cached_transits]
+        generated_transits: dict[str, dict] = {}
+
+        if missing_dates:
+            openai_client = get_openai_client()
+            if not openai_client:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Horoscope generation service not available",
+                )
+
+            if (
+                preferred_location
+                and preferred_location.latitude is not None
+                and preferred_location.longitude is not None
+            ):
+                effective_location = CurrentLocation(
+                    latitude=effective_latitude,
+                    longitude=effective_longitude,
+                )
+            else:
+                effective_location = request.current_location
+
+            transits = generate_transits(
+                birth_data=request.birth_data,
+                current_location=effective_location,
+                start_date=target_date,
+                period=request.period,
+            )
+
+            changes = diff_transits(transits)
+
+            weather_context = [
+                weather_forecasts_map[date_key]
+                for date_key in date_keys
+                if date_key in weather_forecasts_map
             ]
+
+            system_prompt, user_prompt = build_daily_messages_context(
+                request.birth_data,
+                changes,
+                weather_context,
+            )
+
+            response = await call_openai_with_analytics(
+                openai_client=openai_client,
+                endpoint_name="generate-horoscope",
+                user_id=user["uid"],
+                model="gpt-4o-mini",
+                max_output_tokens=1000,
+                temperature=0.7,
+                input=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                    {"role": "assistant", "content": "{"},
+                ],
+            )
+
+            messages_text = extract_response_text(response)
+            generated_messages: list[Horoscope] = parse_daily_messages_response(messages_text)
+
+            user_id_for_audio = user["uid"]
+
+            async def synthesise_audio(message: Horoscope) -> Optional[tuple[str, str, str]]:
+                script = message.audioscript or message.message
+                if not script:
+                    return None
+                message_id = message.message_id or str(uuid.uuid4())
+
+                def _call_tts():
+                    try:
+                        path, audio_format = generate_tts_audio(
+                            script=script,
+                            user_id=user_id_for_audio,
+                            date_key=message.date,
+                            message_id=message_id,
+                            openai_client=openai_client,
+                        )
+                        return path, audio_format, message_id
+                    except Exception as tts_error:
+                        logger.error("TTS synthesis failed: %s", tts_error)
+                        return None
+
+                return await asyncio.to_thread(_call_tts)
+
+            audio_tasks = [
+                synthesise_audio(message)
+                for message in generated_messages
+            ]
+            audio_results = await asyncio.gather(*audio_tasks, return_exceptions=True)
+
+            for message, audio_payload in zip(generated_messages, audio_results):
+                if isinstance(audio_payload, Exception):
+                    logger.error("Audio synthesis errored for message %s: %s", message.message_id, audio_payload)
+                    continue
+                if not audio_payload:
+                    continue
+                audio_path, audio_format, resolved_message_id = audio_payload
+                message.audio_path = cast(str, audio_path)
+                message.audio_format = audio_format
+                if not message.message_id:
+                    message.message_id = resolved_message_id
+                message.voice = "alloy"
+
+            transits_by_date = {
+                _date_key(transit.date): transit for transit in transits
+            }
+            changes_by_date = {change.date: change for change in changes}
+
+            messages_by_date: dict[str, list[Horoscope]] = {}
+            for message in generated_messages:
+                if not message.date:
+                    continue
+                messages_by_date.setdefault(message.date, []).append(message)
+
+            response_forecast_location = preferred_location
+
+            for date_key in missing_dates:
+                transit = transits_by_date.get(date_key)
+                if transit is None:
+                    continue
+                change = changes_by_date.get(date_key)
+                day_messages = messages_by_date.get(date_key, [])
+                weather = weather_forecasts_map.get(date_key)
+
+                generated_transits[date_key] = {
+                    "transit": transit,
+                    "change": change,
+                    "messages": day_messages,
+                    "weather": weather,
+                    "forecast_location": response_forecast_location,
+                }
+
+                _store_transit_document(
+                    firestore_client=firestore_client,
+                    uid=user["uid"],
+                    date_key=date_key,
+                    location_key=location_key,
+                    transit=transit,
+                    change=change,
+                    messages=day_messages,
+                    weather=weather,
+                    forecast_location=response_forecast_location,
+                )
+
+        combined = {**cached_transits, **generated_transits}
+
+        ordered_transits: list[DailyTransit] = []
+        ordered_changes: list[DailyTransitChange] = []
+        ordered_messages: list[Horoscope] = []
+        ordered_weather: list[DailyWeatherForecast] = []
+
+        for date_key in date_keys:
+            entry = combined.get(date_key)
+            if not entry:
+                continue
+            transit = entry.get("transit")
+            change = entry.get("change")
+            messages = entry.get("messages") or []
+            weather = entry.get("weather")
+
+            if transit:
+                ordered_transits.append(transit)
+            if change:
+                ordered_changes.append(change)
+            if messages:
+                ordered_messages.extend(messages)
+            if weather and all(existing.date != weather.date for existing in ordered_weather):
+                ordered_weather.append(weather)
+
+        forecast_location_response = preferred_location
+        if forecast_location_response is None and effective_city:
+            forecast_location_response = ForecastLocation(
+                city_name=effective_city,
+                latitude=effective_latitude,
+                longitude=effective_longitude,
+            )
+
+        return DailyTransitResponse(
+            transits=ordered_transits,
+            changes=ordered_changes,
+            messages=ordered_messages or None,
+            weather=ordered_weather or None,
+            forecast_location=forecast_location_response,
         )
 
-        daily_transit_response = DailyTransitResponse(transits=transits, changes=changes, messages=None)
-        
-        messages_text = extract_response_text(response)
-        messages: list[Horoscope] = parse_daily_messages_response(messages_text)
-        daily_transit_response.messages = messages
-        
-        logger.debug(f"Daily transit data generated successfully: {len(transits)} transits")
-        return daily_transit_response
-        
-    except Exception as e:
-        logger.error(f"Error generating daily transits: {e}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Error generating daily transits: %s", exc)
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to generate daily transits: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate daily transits: {exc}",
+        ) from exc
 
 @router.post("/api/appstore-notifications")
 async def handle_appstore_notifications(request: dict):

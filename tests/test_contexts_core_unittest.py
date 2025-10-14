@@ -330,6 +330,32 @@ class TestRelationshipContext(unittest.TestCase):
         self.assertEqual(analysis.compatibility_level, "Excellent")
         self.assertIn("Strong emotional connection", analysis.relationship_aspects)
 
+    def test_parse_relationship_response_coerces_non_string_lists(self):
+        """Test parsing response where list fields are not plain strings."""
+        messy_response = '''"score": "78",
+        "overview": "Mixed energy between the partners",
+        "compatibility_level": "Moderate",
+        "destiny_signs": "Shared cardinal modalities create both drive and tension",
+        "relationship_aspects": [
+            {"aspect": "Sun square Moon", "meaning": "Dynamic emotional growth"},
+            42
+        ],
+        "strengths": "Commitment to growth",
+        "challenges": [
+            {"issue": "Communication gaps", "advice": ["Practice active listening", "Clarify intentions"]}
+        ],
+        "areas_for_growth": null
+}'''
+
+        analysis = parse_relationship_response(messy_response)
+
+        self.assertEqual(analysis.score, 78)
+        self.assertTrue(any("Sun square Moon" in item for item in analysis.relationship_aspects))
+        self.assertIn("42", " ".join(analysis.relationship_aspects))
+        self.assertEqual(analysis.strengths, ["Commitment to growth"])
+        self.assertTrue(any("Communication gaps" in item for item in analysis.challenges))
+        self.assertEqual(analysis.areas_for_growth, [])
+
 
 class TestChatContext(unittest.TestCase):
     """Test chat context building."""

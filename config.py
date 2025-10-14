@@ -26,6 +26,11 @@ logger = logging.getLogger(__name__)
 # Environment variables
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 FIRESTORE_DATABASE_ID = os.getenv('FIRESTORE_DATABASE_ID')
+WEATHERKIT_TEAM_ID = os.getenv('WEATHERKIT_TEAM_ID', 'F957AP9B34')
+WEATHERKIT_KEY_ID = os.getenv('WEATHERKIT_KEY_ID', '4PDNV2USTN')
+WEATHERKIT_SERVICE_ID = os.getenv('WEATHERKIT_SERVICE_ID', 'com.rafasiqueira.avra.weatherkit-client')
+WEATHERKIT_KEY_PATH = os.getenv('WEATHERKIT_KEY_PATH')
+GCS_AUDIO_BUCKET = os.getenv('GCS_AUDIO_BUCKET')
 
 # App configuration
 APP_TITLE = "Avra API"

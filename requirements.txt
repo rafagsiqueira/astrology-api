@@ -3,7 +3,7 @@ fastapi==0.104.1
 uvicorn==0.24.0
 kerykeion==4.26.2
 python-dotenv==1.0.0
-semantic-kernel==1.35.0
+semantic-kernel==1.37.0
 pytz==2024.2
 timezonefinder==6.2.0
 google-cloud-storage==3.2.0
@@ -13,4 +13,6 @@ pydantic==2.11.7
 PyJWT==2.10.1
 requests-cache==1.2.1
 nltk==3.8.1
+httpx==0.28.1
 pytest==8.4.1
+pytest-asyncio==1.2.0
