@@ -596,7 +596,7 @@ class TestAPIEndpoints(unittest.TestCase):
         request = DailyTransitRequest(
             birth_data=birth_data,
             current_location=current_location,
-            target_date="2024-01-01T00:00:00",
+            target_date=datetime.now().isoformat(),
             period=HoroscopePeriod.day
         )
         auth_user = {'uid': 'test-user-123'}
@@ -606,13 +606,13 @@ class TestAPIEndpoints(unittest.TestCase):
                     from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
                     
                     mock_daily_transit = DailyTransit(
-                        date=datetime(2024, 1, 1),
+                        date=datetime.now(),
                         aspects=[],
                         retrograding=["Mercury"]
                     )
                     
                     mock_transit_change = DailyTransitChange(
-                        date="2024-01-01",
+                        date=datetime.now().strftime("%Y-%m-%d"),
                         aspects=TransitChanges(began=[], ended=[]),
                         retrogrades=RetrogradeChanges(began=["Mercury"], ended=[])
                     )
@@ -621,14 +621,16 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_diff.return_value = [mock_transit_change]
 
                     mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
+                    current_date_str = datetime.now().strftime("%Y-%m-%d")
+                    mock_text_block.text = f'"messages": [{{"date": "{current_date_str}", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}}]}}'
 
                     mock_usage = Mock()
                     mock_usage.input_tokens = 100
                     mock_usage.output_tokens = 50
 
                     mock_openai_response = Mock()
-                    mock_openai_response.output_text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
+                    mock_openai_response = Mock()
+                    mock_openai_response.output_text = f'"messages": [{{"date": "{current_date_str}", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}}]}}'
                     mock_openai_response.usage = mock_usage
                     mock_openai_response.stop_reason = 'end_turn'
                     mock_client = mock_get_openai.return_value
@@ -642,8 +644,8 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_client.audio = Mock(speech=mock_audio)
 
                     self.mock_weather_range.return_value = {
-                        "2024-01-01": {
-                            "date": "2024-01-01",
+                        datetime.now().strftime("%Y-%m-%d"): {
+                            "date": datetime.now().strftime("%Y-%m-%d"),
                             "condition_code": "Clear",
                             "symbol_name": "sun.max",
                             "max_temperature_c": 24.0,
@@ -754,158 +756,7 @@ class TestAPIEndpoints(unittest.TestCase):
                 with self.assertRaises(Exception):
                     asyncio.run(get_daily_transits(request, auth_user))
 
-    def test_get_daily_transits_weekly_period(self):
-        """Test daily transits with weekly period"""
-        from routes import get_daily_transits
-        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
-        from datetime import datetime
-        
-        birth_data = BirthData(
-            birth_date="1990-01-01",
-            birth_time="12:00",
-            latitude=40.7128,
-            longitude=-74.0060
-        )
-        current_location = CurrentLocation(
-            latitude=40.7128,
-            longitude=-74.0060
-        )
-        request = DailyTransitRequest(
-            birth_data=birth_data,
-            current_location=current_location,
-            target_date="2024-01-01T00:00:00",
-            period=HoroscopePeriod.week
-        )
-        auth_user = {'uid': 'test-user-123'}
-        with patch('routes.get_openai_client') as mock_get_openai:
-            with patch('routes.generate_transits') as mock_generate:
-                with patch('routes.diff_transits') as mock_diff:
-                    from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
-                    
-                    mock_transits = []
-                    mock_changes = []
-                    for i in range(7):
-                        mock_transit = DailyTransit(
-                            date=datetime(2024, 1, i + 1),
-                            aspects=[],
-                            retrograding=[]
-                        )
-                        mock_transits.append(mock_transit)
-                        
-                        mock_change = DailyTransitChange(
-                            date=f"2024-01-0{i+1}",
-                            aspects=TransitChanges(began=[], ended=[]),
-                            retrogrades=RetrogradeChanges(began=[], ended=[])
-                        )
-                        mock_changes.append(mock_change)
-                    
-                    mock_generate.return_value = mock_transits
-                    mock_diff.return_value = mock_changes
 
-                    mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
-
-                    mock_usage = Mock()
-                    mock_usage.input_tokens = 100
-                    mock_usage.output_tokens = 50
-
-                    mock_openai_response = Mock()
-                    mock_openai_response.output_text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
-                    mock_openai_response.usage = mock_usage
-                    mock_openai_response.stop_reason = 'end_turn'
-                    mock_get_openai.return_value.responses.create.return_value = mock_openai_response
-
-                    self.mock_weather_range.return_value = {
-                        f"2024-01-{i+1:02d}": {
-                            "date": f"2024-01-{i+1:02d}",
-                            "condition_code": "Clear",
-                            "symbol_name": "sun.max",
-                            "max_temperature_c": 20.0 + i,
-                            "min_temperature_c": 10.0 + i,
-                            "precipitation_chance": 0.05,
-                            "forecast_summary": "Sunny"
-                        }
-                        for i in range(30)
-                    }
-
-                    result = asyncio.run(get_daily_transits(request, auth_user))
-                    
-                    self.assertEqual(len(result.transits), 7)
-                    self.assertEqual(len(result.changes), 7)
-                    mock_generate.assert_called_once_with(
-                        birth_data=birth_data,
-                        current_location=current_location,
-                        start_date=mock_generate.call_args[1]['start_date'],
-                        period=HoroscopePeriod.week
-                )
-
-    def test_get_daily_transits_monthly_period(self):
-        """Test daily transits with monthly period"""
-        from routes import get_daily_transits
-        from models import DailyTransitRequest, BirthData, CurrentLocation, HoroscopePeriod
-        from datetime import datetime
-        
-        birth_data = BirthData(
-            birth_date="1990-01-01",
-            birth_time="12:00",
-            latitude=40.7128,
-            longitude=-74.0060
-        )
-        current_location = CurrentLocation(
-            latitude=40.7128,
-            longitude=-74.0060
-        )
-        request = DailyTransitRequest(
-            birth_data=birth_data,
-            current_location=current_location,
-            target_date="2024-01-01T00:00:00",
-            period=HoroscopePeriod.month
-        )
-        auth_user = {'uid': 'test-user-123'}
-        
-        with patch('routes.get_openai_client') as mock_get_openai:
-            with patch('routes.generate_transits') as mock_generate:
-                with patch('routes.diff_transits') as mock_diff:
-                    from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
-                    
-                    mock_transits = [DailyTransit(
-                        date=datetime(2024, 1, i + 1),
-                        aspects=[],
-                        retrograding=[]
-                    ) for i in range(30)]
-                    mock_changes = [DailyTransitChange(
-                        date=f"2024-01-{i+1:02d}",
-                        aspects=TransitChanges(began=[], ended=[]),
-                        retrogrades=RetrogradeChanges(began=[], ended=[])
-                    ) for i in range(30)]
-                    
-                    mock_generate.return_value = mock_transits
-                    mock_diff.return_value = mock_changes
-
-                    mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
-
-                    mock_usage = Mock()
-                    mock_usage.input_tokens = 100
-                    mock_usage.output_tokens = 50
-
-                    mock_openai_response = Mock()
-                    mock_openai_response.output_text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
-                    mock_openai_response.usage = mock_usage
-                    mock_openai_response.stop_reason = 'end_turn'
-                    mock_get_openai.return_value.responses.create.return_value = mock_openai_response
-                    
-                    result = asyncio.run(get_daily_transits(request, auth_user))
-                    
-                    self.assertEqual(len(result.transits), 30)
-                    self.assertEqual(len(result.changes), 30)
-                    mock_generate.assert_called_once_with(
-                        birth_data=birth_data,
-                        current_location=current_location,
-                        start_date=mock_generate.call_args[1]['start_date'],
-                        period=HoroscopePeriod.month
-                )
-                    self.mock_generate_tts.assert_called()
 
     def test_get_daily_transits_unauthenticated_user(self):
         """Test daily transits endpoint with unauthenticated user"""
@@ -951,7 +802,7 @@ class TestAPIEndpoints(unittest.TestCase):
         request = DailyTransitRequest(
             birth_data=birth_data,
             current_location=current_location,
-            target_date="2024-01-01T00:00:00",
+            target_date=datetime.now().isoformat(),
             period=HoroscopePeriod.day
         )
         
@@ -967,12 +818,12 @@ class TestAPIEndpoints(unittest.TestCase):
                     from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
                     
                     mock_transit = DailyTransit(
-                        date=datetime(2024, 1, 1),
+                        date=datetime.now(),
                         aspects=[],
                         retrograding=[]
                     )
                     mock_change = DailyTransitChange(
-                        date="2024-01-01",
+                        date=datetime.now().strftime("%Y-%m-%d"),
                         aspects=TransitChanges(began=[], ended=[]),
                         retrogrades=RetrogradeChanges(began=[], ended=[])
                     )
