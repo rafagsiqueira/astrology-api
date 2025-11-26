@@ -16,3 +16,4 @@ nltk==3.8.1
 httpx==0.28.1
 pytest==8.4.1
 pytest-asyncio==1.2.0
+app-store-server-library>=1.0.0
