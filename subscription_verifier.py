@@ -11,7 +11,7 @@ class SubscriptionVerifier:
     """Verifies App Store receipts and subscriptions."""
 
     def __init__(self):
-        self.bundle_id = os.getenv("IOS_BUNDLE_ID", "com.avra.app")
+        self.bundle_id = os.getenv("IOS_BUNDLE_ID", "com.rafasiqueira.avra")
         self.issuer_id = os.getenv("APP_STORE_ISSUER_ID")
         self.key_id = os.getenv("APP_STORE_KEY_ID")
         self.private_key = os.getenv("APP_STORE_PRIVATE_KEY")
@@ -79,14 +79,14 @@ class SubscriptionVerifier:
 
         try:
             # Get transaction info from Apple
-            response = await self._client.get_transaction_info(transaction_id)
+            response = self._client.get_transaction_info(transaction_id)
             
             if not response or not response.signedTransactionInfo:
                 logger.error("No signed transaction info received from Apple")
                 return None
                 
             # Verify and decode the signed transaction info
-            verified_transaction = await self._verifier.verify_and_decode_transaction(response.signedTransactionInfo)
+            verified_transaction = self._verifier.verify_and_decode_signed_transaction(response.signedTransactionInfo)
             
             # Convert AppTransaction object to dict for easier usage
             # The library returns a pydantic model or similar object
