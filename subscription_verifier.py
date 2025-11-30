@@ -27,11 +27,11 @@ class SubscriptionVerifier:
             return
 
         try:
-            # Handle private key potentially being a path or the key itself
-            private_key = read_private_key(self.private_key)
+            with open(self.private_key, "rb") as f:
+                private_key_content = f.read()
             
             self._client = AppStoreServerAPIClient(
-                signing_key=private_key,
+                signing_key=private_key_content,
                 key_id=self.key_id,
                 issuer_id=self.issuer_id,
                 bundle_id=self.bundle_id,
