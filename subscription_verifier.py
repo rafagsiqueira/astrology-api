@@ -28,15 +28,10 @@ class SubscriptionVerifier:
 
         try:
             # Handle private key potentially being a path or the key itself
-            private_key_content = self.private_key
-            if os.path.exists(self.private_key):
-                with open(self.private_key, "rb") as f:
-                    private_key_content = f.read()
-            elif isinstance(private_key_content, str):
-                private_key_content = private_key_content.encode('utf-8')
+            private_key = read_private_key(self.private_key)
             
             self._client = AppStoreServerAPIClient(
-                signing_key=private_key_content,
+                signing_key=private_key,
                 key_id=self.key_id,
                 issuer_id=self.issuer_id,
                 bundle_id=self.bundle_id,
