@@ -77,6 +77,8 @@ class SubscriptionVerifier:
             logger.error("SubscriptionVerifier not fully initialized")
             return None
 
+        logger.info(f"Verifying transaction {transaction_id} with Bundle ID: {self.bundle_id}, Environment: {self.environment}")
+
         try:
             # Get transaction info from Apple
             response = self._client.get_transaction_info(transaction_id)
@@ -111,5 +113,5 @@ class SubscriptionVerifier:
             }
             
         except Exception as e:
-            logger.error(f"Failed to verify transaction {transaction_id}: {e}")
+            logger.error(f"Failed to verify transaction {transaction_id}: {e} (Type: {type(e).__name__})")
             return None
