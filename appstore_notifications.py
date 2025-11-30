@@ -17,6 +17,7 @@ from subscription_models import (
 )
 from subscription_analytics import get_subscription_analytics_service
 from auth import get_firestore_client
+from google.cloud.firestore import FieldFilter
 from config import get_logger
 
 logger = get_logger(__name__)
@@ -128,7 +129,7 @@ class AppStoreNotificationHandler:
             
             # Query subscriptions collection for this original transaction ID
             subscriptions_query = db.collection('subscriptions').where(
-                'original_transaction_id', '==', original_transaction_id
+                filter=FieldFilter('original_transaction_id', '==', original_transaction_id)
             ).limit(1)
             
             docs = subscriptions_query.get()

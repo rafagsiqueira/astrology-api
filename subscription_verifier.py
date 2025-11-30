@@ -109,7 +109,7 @@ class SubscriptionVerifier:
             # Let's assume it has attributes matching the JSON fields.
             
             # Helper to convert to dict (simplified)
-            return {
+            verified_transaction = {
                 "transactionId": verified_transaction.transactionId,
                 "originalTransactionId": verified_transaction.originalTransactionId,
                 "productId": verified_transaction.productId,
@@ -117,8 +117,9 @@ class SubscriptionVerifier:
                 "expiresDate": verified_transaction.expiresDate,
                 "revocationDate": verified_transaction.revocationDate,
                 "environment": verified_transaction.environment,
-                # Add other fields as needed
             }
+            logger.debug(f"Verified transaction {verified_transaction}")
+            return verified_transaction
             
         except Exception as e:
             logger.error(f"Failed to verify transaction {transaction_id}: {e} (Type: {type(e).__name__})", exc_info=True)

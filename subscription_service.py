@@ -4,6 +4,7 @@ from typing import Optional
 from datetime import datetime, timezone
 from auth import get_firestore_client
 from subscription_models import UserSubscription, SubscriptionStatus, SubscriptionType
+from google.cloud.firestore import FieldFilter
 from config import get_logger
 
 logger = get_logger(__name__)
@@ -25,7 +26,7 @@ class SubscriptionService:
             
             # Query subscriptions collection for this user
             subscriptions_query = db.collection('subscriptions').where(
-                'user_id', '==', user_id
+                filter=FieldFilter('user_id', '==', user_id)
             ).order_by('created_at', direction='DESCENDING').limit(1)
             
             docs = subscriptions_query.get()

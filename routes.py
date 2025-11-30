@@ -13,6 +13,7 @@ import openai
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from firebase_admin import firestore as firebase_firestore
+from google.cloud.firestore import FieldFilter
 from kerykeion.relationship_score import RelationshipScoreFactory
 from pydantic import ValidationError
 
@@ -426,15 +427,17 @@ async def enhance_profile_with_chat_context(user_id: str, profile: dict, db) -> 
         # Retrieve relationships subcollection
         relationships_data = None
         try:
-            relationships_ref = db.collection('relationships').where('partner_1_uid', '==', user_id)
-            relationships_docs = relationships_ref.get()
             relationships_list = []
+            
+            # Check where user is partner_1
+            relationships_ref = db.collection('relationships').where(filter=FieldFilter('partner_1_uid', '==', user_id))
+            relationships_docs = relationships_ref.get()
             for doc in relationships_docs:
                 if doc.exists:
                     relationships_list.append(doc.to_dict())
             
             # Also check where user is partner_2
-            relationships_ref_2 = db.collection('relationships').where('partner_2_uid', '==', user_id)
+            relationships_ref_2 = db.collection('relationships').where(filter=FieldFilter('partner_2_uid', '==', user_id))
             relationships_docs_2 = relationships_ref_2.get()
             for doc in relationships_docs_2:
                 if doc.exists:
