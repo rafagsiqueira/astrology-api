@@ -39,7 +39,7 @@ class SubscriptionVerifier:
             )
 
             # Load Apple Root Certificate
-            cert_path = os.path.join(os.path.dirname(__file__), "assets", "AppleIncRootCertificate.pem")
+            cert_path = os.path.join(os.path.dirname(__file__), "assets", "AppleIncRootCertificate.cer")
             if not os.path.exists(cert_path):
                 logger.warning(f"Apple Root Certificate not found at {cert_path}")
                 return
