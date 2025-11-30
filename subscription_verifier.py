@@ -38,14 +38,27 @@ class SubscriptionVerifier:
                 environment=self.environment
             )
 
-            # Load Apple Root Certificate
-            cert_path = os.path.join(os.path.dirname(__file__), "assets", "AppleIncRootCertificate.cer")
-            if not os.path.exists(cert_path):
-                logger.warning(f"Apple Root Certificate not found at {cert_path}")
-                return
+            # Load Apple Root Certificates
+            root_certificates = []
+            
+            # Directories to check for certificates
+            cert_dir = os.path.join(os.path.dirname(__file__), "assets", "root_certs")
+            
+            if os.path.exists(cert_dir):
+                for filename in os.listdir(cert_dir):
+                    if filename.endswith(".cer"):
+                        filepath = os.path.join(cert_dir, filename)
+                        try:
+                            with open(filepath, "rb") as f:
+                                cert_content = f.read()
+                                root_certificates.append(cert_content)
+                                logger.info(f"Loaded root certificate: {filename}")
+                        except Exception as e:
+                            logger.warning(f"Failed to load certificate {filename}: {e}")
 
-            with open(cert_path, "rb") as f:
-                root_certificates = [f.read()]
+            if not root_certificates:
+                logger.warning("No Apple Root Certificates found.")
+                return
 
             self._verifier = SignedDataVerifier(
                 root_certificates=root_certificates,
