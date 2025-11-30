@@ -83,7 +83,7 @@ class SubscriptionVerifier:
                 return None
                 
             # Verify and decode the signed transaction info
-            verified_transaction = self._verifier.verify_and_decode_signed_transaction(response.signedTransactionInfo)
+            verified_transaction = self._verifier.verify_and_decode_app_transaction(response.signedTransactionInfo)
             
             # Convert AppTransaction object to dict for easier usage
             # The library returns a pydantic model or similar object
