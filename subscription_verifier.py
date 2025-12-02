@@ -15,7 +15,7 @@ class SubscriptionVerifier:
         self.issuer_id = os.getenv("APP_STORE_ISSUER_ID")
         self.key_id = os.getenv("APP_STORE_KEY_ID")
         self.private_key = os.getenv("APP_STORE_PRIVATE_KEY")
-        self.environment = Environment.SANDBOX if os.getenv("APP_ENV") != "production" else Environment.PRODUCTION
+        self.environment = get_environment()
         
         self._client: Optional[AppStoreServerAPIClient] = None
         self._initialize_client()
@@ -30,13 +30,13 @@ class SubscriptionVerifier:
             with open(self.private_key, "rb") as f:
                 private_key_content = f.read()
             
-            self._client = AppStoreServerAPIClient(
-                signing_key=private_key_content,
-                key_id=self.key_id,
-                issuer_id=self.issuer_id,
-                bundle_id=self.bundle_id,
-                environment=self.environment
-            )
+            # self._client = AppStoreServerAPIClient(
+            #     signing_key=private_key_content,
+            #     key_id=self.key_id,
+            #     issuer_id=self.issuer_id,
+            #     bundle_id=self.bundle_id,
+            #     environment=self.environment
+            # )
 
             # Load Apple Root Certificates
             root_certificates = []
@@ -71,7 +71,11 @@ class SubscriptionVerifier:
         except Exception as e:
             logger.error(f"Failed to initialize SubscriptionVerifier: {e}")
 
-    async def verify_transaction(self, transaction_id: str) -> Optional[dict]:
+    def get_verifier(self) -> Optional[SignedDataVerifier]:
+        """Get the initialized SignedDataVerifier instance."""
+        return self._verifier
+
+    async def verify_transaction(self, request: dict) -> JWSTransactionDecodedPayload:
         """
         Verify a transaction ID with Apple and return the transaction info.
         
@@ -81,43 +85,15 @@ class SubscriptionVerifier:
         Returns:
             Dictionary with transaction details if valid, None otherwise.
         """
-        if not self._client or not self._verifier:
-            logger.error("SubscriptionVerifier not fully initialized")
-            return None
+        if not self._verifier:
+            raise("SubscriptionVerifier not fully initialized")
 
-        logger.info(f"Verifying transaction {transaction_id} with Bundle ID: {self.bundle_id}, Environment: {self.environment}")
+        logger.info(f"Verifying transaction {request.get("transactionId")} with Bundle ID: {self.bundle_id}, Environment: {self.environment}")
 
         try:
-            # Get transaction info from Apple
-            response = self._client.get_transaction_info(transaction_id)
-            
-            if not response or not response.signedTransactionInfo:
-                logger.error("No signed transaction info received from Apple")
-                return None
-                
             # Verify and decode the signed transaction info
-            verified_transaction = self._verifier.verify_and_decode_app_transaction(response.signedTransactionInfo)
+            verified_transaction = self._verifier.verify_and_decode_signed_transaction(request["verificationData"])
             
-            # Convert AppTransaction object to dict for easier usage
-            # The library returns a pydantic model or similar object
-            # We can use vars() or .__dict__ or manual mapping
-            
-            # Assuming verified_transaction is an AppTransaction object
-            # We'll return a dict representation
-            
-            # Note: The library might return a specific object type. 
-            # Let's assume it has attributes matching the JSON fields.
-            
-            # Helper to convert to dict (simplified)
-            verified_transaction = {
-                "transactionId": verified_transaction.transactionId,
-                "originalTransactionId": verified_transaction.originalTransactionId,
-                "productId": verified_transaction.productId,
-                "purchaseDate": verified_transaction.purchaseDate,
-                "expiresDate": verified_transaction.expiresDate,
-                "revocationDate": verified_transaction.revocationDate,
-                "environment": verified_transaction.environment,
-            }
             logger.debug(f"Verified transaction {verified_transaction}")
             return verified_transaction
             
@@ -125,3 +101,14 @@ class SubscriptionVerifier:
             logger.error(f"Failed to verify transaction {transaction_id}: {e} (Type: {type(e).__name__})", exc_info=True)
             logger.error(e)
             return None
+
+def get_environment():
+    env = os.getenv("APP_ENV")
+    if env == "sandbox":
+        return Environment.SANDBOX
+    elif env == "xcode":
+        return Environment.XCODE
+    elif env == "local":
+        return Environment.LOCAL
+    else:
+        return Environment.PRODUCTION

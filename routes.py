@@ -16,6 +16,7 @@ from firebase_admin import firestore as firebase_firestore
 from google.cloud.firestore import FieldFilter
 from kerykeion.relationship_score import RelationshipScoreFactory
 from pydantic import ValidationError
+from appstoreserverlibrary.models.JWSTransactionDecodedPayload import JWSTransactionDecodedPayload
 
 from contexts import (
     build_birth_chart_context,
@@ -696,7 +697,7 @@ async def analyze_relationship(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to analyze relationship: {str(e)}")
 
-@router.post("/api/subscriptions/verify")
+@router.post("/api/transactions")
 async def verify_subscription(
     request: dict,
     user: dict = Depends(verify_firebase_token)
@@ -706,57 +707,28 @@ async def verify_subscription(
     if not transaction_id:
         raise HTTPException(status_code=400, detail="Transaction ID required")
 
-    # Bypass for local testing with Simulator (transactionId "0")
-    if str(transaction_id) == "0" and os.getenv("APP_ENV") in ["development", "sandbox"]:
-        logger.warning("Bypassing verification for test transaction ID '0'")
-        return {
-            "status": "verified",
-            "transaction": {
-                "transactionId": "0",
-                "originalTransactionId": "0",
-                "productId": request.get("productId", "unknown_product"),
-                "purchaseDate": int(datetime.now().timestamp() * 1000),
-                "expiresDate": int((datetime.now() + timedelta(days=30)).timestamp() * 1000),
-                "environment": "Sandbox"
-            }
-        }
-
     verifier = SubscriptionVerifier()
-    transaction_info = await verifier.verify_transaction(transaction_id)
+    verified_transaction: JWSTransactionDecodedPayload = await verifier.verify_transaction(request)
     
-    if not transaction_info:
+    if not verified_transaction:
         raise HTTPException(status_code=400, detail="Invalid transaction")
         
-    # Update user subscription in Firestore
-    # We should delegate this to subscription_service to handle the logic of 
-    # mapping Apple transaction info to our internal model
-    # For now, we'll just return success if verified, assuming the service will be updated later
-    # or we can do a quick update here.
-    
-    # Ideally, we should parse the transaction_info and update the DB.
-    # transaction_info contains: originalTransactionId, productId, purchaseDate, expiresDate, etc.
-    
     try:
-        db = get_firestore_client()
         subscription_service = get_subscription_service()
         
-        # Map to our model (simplified)
-        # This part should be robustly handled in subscription_service, but putting it here for now
-        # to fulfill the requirement of "Update purchase flow to send verification data to backend"
+        # Update subscription in Firestore
+        success = await subscription_service.update_subscription_from_transaction(verified_transaction)
         
-        # We need to determine the subscription type and status
-        product_id = transaction_info.get("productId")
-        expires_date_ms = transaction_info.get("expiresDate")
+        if not success:
+            raise(f"Failed to update subscription for transaction {transaction_id}")
         
-        # ... (Logic to update Firestore would go here)
-        
-        return {"status": "verified", "transaction": transaction_info}
+        return {"status": "verified", "transaction": verified_transaction}
         
     except Exception as e:
         logger.error(f"Error updating subscription: {e}")
         raise HTTPException(status_code=500, detail="Failed to update subscription")
 
-@router.get("/api/subscriptions/status")
+@router.get("/api/subscription")
 async def get_subscription_status_endpoint(
     user: dict = Depends(verify_firebase_token)
 ):

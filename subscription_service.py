@@ -3,8 +3,11 @@
 from typing import Optional
 from datetime import datetime, timezone
 from auth import get_firestore_client
-from subscription_models import UserSubscription, SubscriptionStatus, SubscriptionType
+from subscription_models import UserSubscription, SubscriptionStatus, SubscriptionType, AppStoreEnvironment, PRODUCT_ID_MAPPINGS
 from google.cloud.firestore import FieldFilter
+from appstoreserverlibrary.models.JWSTransactionDecodedPayload import JWSTransactionDecodedPayload
+from appstoreserverlibrary.models.NotificationTypeV2 import NotificationTypeV2
+from appstoreserverlibrary.models.Subtype import Subtype
 from config import get_logger
 
 logger = get_logger(__name__)
@@ -118,6 +121,122 @@ class SubscriptionService:
             
         except Exception as e:
             logger.error(f"Error checking premium access for user {user_id}: {e}")
+            return False
+
+    async def update_subscription_from_transaction(
+        self, 
+        transaction_info: JWSTransactionDecodedPayload, 
+        notification_type: Optional[NotificationTypeV2] = None, 
+        subtype: Optional[Subtype] = None
+    ) -> bool:
+        """
+        Update user subscription in Firestore based on transaction info.
+        
+        Args:
+            transaction_info: Decoded transaction payload from App Store
+            notification_type: Optional notification type triggering this update
+            subtype: Optional notification subtype
+            
+        Returns:
+            True if update was successful, False otherwise
+        """
+        try:
+            db = get_firestore_client()
+            if not db:
+                logger.error("Firestore client not available")
+                return False
+
+            original_transaction_id = transaction_info.originalTransactionId
+            
+            # Find user associated with this original transaction ID
+            user_id = None
+            
+            # First check if we already have a subscription with this original_transaction_id
+            subscriptions_query = db.collection('subscriptions').where(
+                filter=FieldFilter('original_transaction_id', '==', original_transaction_id)
+            ).limit(1)
+            
+            docs = subscriptions_query.get()
+            for doc in docs:
+                subscription_data = doc.to_dict()
+                user_id = subscription_data.get('user_id')
+                break
+            
+            if not user_id:
+                logger.warning(f"No user found for original transaction ID: {original_transaction_id}")
+                # In a real scenario, we might want to create a dangling subscription record 
+                # or log this for manual review if it's an INITIAL_BUY notification 
+                # but we don't know the user yet (e.g. if the app hasn't sent the receipt yet).
+                # For now, we can't update a user's subscription if we don't know who they are.
+                return False
+
+            # Determine subscription status and type
+            product_id = transaction_info.productId
+            subscription_type = PRODUCT_ID_MAPPINGS.get(product_id, SubscriptionType.MONTHLY)
+            
+            # Default status
+            status = SubscriptionStatus.ACTIVE
+            
+            # Handle expiration
+            expires_date_ms = transaction_info.expiresDate
+            if expires_date_ms:
+                expires_date = datetime.fromtimestamp(expires_date_ms / 1000, tz=timezone.utc)
+                if expires_date < datetime.now(timezone.utc):
+                    status = SubscriptionStatus.EXPIRED
+            else:
+                expires_date = None
+
+            # Handle specific notification types/subtypes logic
+            if notification_type == NotificationTypeV2.DID_RENEW:
+                status = SubscriptionStatus.ACTIVE
+            elif notification_type == NotificationTypeV2.EXPIRED: # Note: V2 uses EXPIRED
+                status = SubscriptionStatus.EXPIRED
+            elif notification_type == NotificationTypeV2.DID_FAIL_TO_RENEW:
+                status = SubscriptionStatus.BILLING_RETRY
+                # You might want to check is_in_billing_retry_period from renewal info if available
+            
+            # Create or update subscription object
+            subscription = UserSubscription(
+                user_id=user_id,
+                subscription_type=subscription_type,
+                subscription_status=status,
+                original_transaction_id=original_transaction_id,
+                current_transaction_id=transaction_info.transactionId,
+                product_id=product_id,
+                purchase_date=datetime.fromtimestamp(transaction_info.purchaseDate / 1000, tz=timezone.utc),
+                expires_date=expires_date,
+                environment=AppStoreEnvironment.SANDBOX if transaction_info.environment == "Sandbox" else AppStoreEnvironment.PRODUCTION,
+                updated_at=datetime.now(timezone.utc)
+            )
+            
+            # Update Firestore
+            # We use the original_transaction_id as a stable key or query by it. 
+            # Since we found the doc above, we can update it.
+            # But wait, a user might have multiple subscriptions? 
+            # Usually one active subscription per group.
+            # Let's update the specific document we found or create a new one if logic dictates.
+            # Ideally we update the document corresponding to this original_transaction_id.
+            
+            # Re-query to get the doc ref (or use the one from above if we kept it)
+            # We'll just add/merge the data.
+            
+            # Using a composite ID or just auto-id? 
+            # The previous code seemed to query by user_id. 
+            # Let's assume we update the document found.
+            
+            if docs:
+                doc_ref = docs[0].reference
+                doc_ref.set(subscription.to_firestore_dict(), merge=True)
+                logger.info(f"Updated subscription for user {user_id} (Original Tx: {original_transaction_id})")
+            else:
+                # This case shouldn't be reached given the check above, but for safety:
+                logger.error(f"Subscription document disappeared for {original_transaction_id}")
+                return False
+                
+            return True
+
+        except Exception as e:
+            logger.error(f"Error updating subscription from transaction: {e}")
             return False
 
 
