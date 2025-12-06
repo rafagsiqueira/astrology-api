@@ -5,6 +5,7 @@ from appstoreserverlibrary.models.Environment import Environment
 from appstoreserverlibrary.models.JWSTransactionDecodedPayload import JWSTransactionDecodedPayload
 from appstoreserverlibrary.signed_data_verifier import SignedDataVerifier
 from config import get_logger
+import jwt
 
 logger = get_logger(__name__)
 
@@ -114,12 +115,35 @@ class SubscriptionVerifier:
         Returns:
             Dictionary with transaction details if valid, None otherwise.
         """
-        if not self._verifier:
-            raise("SubscriptionVerifier not fully initialized")
-
         transaction_id = request.get("transactionId")
         signed_data = request.get("verificationData")
+
         logger.info(f"Verifying transaction {transaction_id} with Bundle ID: {self.bundle_id}, Environment: {self.environment}")
+        
+        if self.environment == Environment.XCODE:
+            logger.warning("Bypassing verification for Xcode environment.")
+            if not signed_data:
+                 logger.error("No signed data provided for Xcode verification bypass")
+                 return None
+            try:
+                # Decode JWS without verification
+                decoded_data = jwt.decode(signed_data, options={"verify_signature": False})
+                logger.info(f"Decoded payload in Xcode mode: {decoded_data}")
+                
+                 # Create JWSTransactionDecodedPayload from decoded data
+                 # We filter keys to ensure we don't pass unexpected arguments if the payload has extras
+                valid_keys = JWSTransactionDecodedPayload.__init__.__code__.co_varnames
+                filtered_data = {k: v for k, v in decoded_data.items() if k in valid_keys}
+                
+                return JWSTransactionDecodedPayload(**filtered_data)
+            except Exception as e:
+                logger.error(f"Failed to decode JWS in Xcode mode: {e}")
+                import traceback
+                traceback.print_exc()
+                return None
+
+        if not self._verifier:
+            raise("SubscriptionVerifier not fully initialized")
 
         try:
             # Verify and decode the signed transaction info
@@ -130,7 +154,6 @@ class SubscriptionVerifier:
             
         except Exception as e:
             logger.error(f"Failed to verify transaction {transaction_id}: {e} (Type: {type(e).__name__})", exc_info=True)
-            logger.error(f"Debug: {signed_data}")
             logger.error(e)
             return None
 
