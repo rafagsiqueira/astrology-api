@@ -2,6 +2,7 @@
 
 from typing import Optional
 from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
 from appstoreserverlibrary.models.NotificationTypeV2 import NotificationTypeV2
 from appstoreserverlibrary.models.Subtype import Subtype
 from appstoreserverlibrary.models.Environment import Environment
@@ -37,7 +38,7 @@ class AppStoreNotificationHandler:
             
             await self.process_signed_payload(signed_payload)
                 
-            return {"status": "success"}
+            return JSONResponse(content={"status": "success"}, status_code=200)
             
         except Exception as e:
             logger.error(f"Error handling notification: {e}")
