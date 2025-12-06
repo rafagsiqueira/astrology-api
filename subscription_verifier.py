@@ -68,7 +68,8 @@ class SubscriptionVerifier:
                 app_apple_id=None, # Optional
                 enable_online_checks=True
             )
-            
+        except ValueError as e:
+            logger.warn(f"Failed to initialize API client. Are you running on a valid environment?")
         except Exception as e:
             logger.error(f"Failed to initialize SubscriptionVerifier: {e}")
 
