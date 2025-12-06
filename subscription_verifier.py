@@ -16,6 +16,7 @@ class SubscriptionVerifier:
         self.issuer_id = os.getenv("APP_STORE_ISSUER_ID")
         self.key_id = os.getenv("APP_STORE_KEY_ID")
         self.private_key = os.getenv("APP_STORE_PRIVATE_KEY")
+        self.app_id = os.getenv("APP_ID")
         self.environment = get_environment()
         
         self._client: Optional[AppStoreServerAPIClient] = None
@@ -61,11 +62,13 @@ class SubscriptionVerifier:
                 logger.warning("No Apple Root Certificates found.")
                 return
 
+            logger.info(f"Lenght of chain: {len(root_certificates)}")
+
             self._verifier = SignedDataVerifier(
                 root_certificates=root_certificates,
                 bundle_id=self.bundle_id,
                 environment=self.environment,
-                app_apple_id=None, # Optional
+                app_apple_id=self.app_id,
                 enable_online_checks=True
             )
         except ValueError as e:
