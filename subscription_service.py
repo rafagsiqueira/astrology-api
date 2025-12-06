@@ -162,6 +162,12 @@ class SubscriptionService:
                 user_id = subscription_data.get('user_id')
                 break
             
+            # If not found via existing subscription, check the transaction's appAccountToken
+            if not user_id:
+                if hasattr(transaction_info, 'appAccountToken') and transaction_info.appAccountToken:
+                     user_id = transaction_info.appAccountToken
+                     logger.info(f"User ID {user_id} found in appAccountToken for {original_transaction_id}")
+            
             if not user_id:
                 logger.warning(f"No user found for original transaction ID: {original_transaction_id}")
                 # In a real scenario, we might want to create a dangling subscription record 
@@ -229,9 +235,9 @@ class SubscriptionService:
                 doc_ref.set(subscription.to_firestore_dict(), merge=True)
                 logger.info(f"Updated subscription for user {user_id} (Original Tx: {original_transaction_id})")
             else:
-                # This case shouldn't be reached given the check above, but for safety:
-                logger.error(f"Subscription document disappeared for {original_transaction_id}")
-                return False
+                 # New subscription for this original_transaction_id
+                 db.collection('subscriptions').add(subscription.to_firestore_dict())
+                 logger.info(f"Created new subscription for user {user_id} (Original Tx: {original_transaction_id})")
                 
             return True
 
