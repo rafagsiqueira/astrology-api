@@ -1,5 +1,6 @@
 """Main application file for Avra backend."""
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -18,8 +19,20 @@ logger = get_logger(__name__)
 # Initialize Firebase
 initialize_firebase()
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan events for the application."""
+    # Startup
+    try:
+        handler = get_notification_handler()
+        await handler.fetch_missed_notifications()
+    except Exception as e:
+        logger.error(f"Error during startup task: {e}")
+    yield
+    # Shutdown (if needed) behavior goes here
+
 # Create FastAPI app
-app = FastAPI(title=APP_TITLE, version=APP_VERSION)
+app = FastAPI(title=APP_TITLE, version=APP_VERSION, lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
@@ -35,14 +48,6 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 # Include routes
 app.include_router(router)
 
-@app.on_event("startup")
-async def startup_event():
-    """Run tasks on server startup."""
-    try:
-        handler = get_notification_handler()
-        await handler.fetch_missed_notifications()
-    except Exception as e:
-        logger.error(f"Error during startup task: {e}")
 
 
 if __name__ == "__main__":
