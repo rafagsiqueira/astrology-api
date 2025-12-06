@@ -2,6 +2,7 @@ import os
 from typing import Optional
 from appstoreserverlibrary.api_client import AppStoreServerAPIClient
 from appstoreserverlibrary.models.Environment import Environment
+from appstoreserverlibrary.models.JWSTransactionDecodedPayload import JWSTransactionDecodedPayload
 from appstoreserverlibrary.signed_data_verifier import SignedDataVerifier
 from config import get_logger
 
@@ -30,13 +31,13 @@ class SubscriptionVerifier:
             with open(self.private_key, "rb") as f:
                 private_key_content = f.read()
             
-            # self._client = AppStoreServerAPIClient(
-            #     signing_key=private_key_content,
-            #     key_id=self.key_id,
-            #     issuer_id=self.issuer_id,
-            #     bundle_id=self.bundle_id,
-            #     environment=self.environment
-            # )
+            self._client = AppStoreServerAPIClient(
+                signing_key=private_key_content,
+                key_id=self.key_id,
+                issuer_id=self.issuer_id,
+                bundle_id=self.bundle_id,
+                environment=self.environment
+            )
 
             # Load Apple Root Certificates
             root_certificates = []
@@ -71,6 +72,13 @@ class SubscriptionVerifier:
         except Exception as e:
             logger.error(f"Failed to initialize SubscriptionVerifier: {e}")
 
+    async def get_api_client(self) -> Optional[AppStoreServerAPIClient]:
+        """Get the initialized AppStoreServerAPIClient instance."""
+        if not self._client:
+            # Try to re-initialize if missing (lazy loading attempt)
+             self._initialize_client()
+        return self._client
+
     def get_verifier(self) -> Optional[SignedDataVerifier]:
         """Get the initialized SignedDataVerifier instance."""
         return self._verifier
@@ -88,7 +96,8 @@ class SubscriptionVerifier:
         if not self._verifier:
             raise("SubscriptionVerifier not fully initialized")
 
-        logger.info(f"Verifying transaction {request.get("transactionId")} with Bundle ID: {self.bundle_id}, Environment: {self.environment}")
+        transaction_id = request.get("transactionId")
+        logger.info(f"Verifying transaction {transaction_id} with Bundle ID: {self.bundle_id}, Environment: {self.environment}")
 
         try:
             # Verify and decode the signed transaction info

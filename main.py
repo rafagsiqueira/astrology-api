@@ -10,6 +10,7 @@ from config import (
 )
 from auth import initialize_firebase
 from routes import router
+from appstore_notifications import get_notification_handler
 
 # Initialize logging
 logger = get_logger(__name__)
@@ -33,6 +34,15 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Include routes
 app.include_router(router)
+
+@app.on_event("startup")
+async def startup_event():
+    """Run tasks on server startup."""
+    try:
+        handler = get_notification_handler()
+        await handler.fetch_missed_notifications()
+    except Exception as e:
+        logger.error(f"Error during startup task: {e}")
 
 
 if __name__ == "__main__":
