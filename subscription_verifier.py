@@ -129,6 +129,7 @@ class SubscriptionVerifier:
             
         except Exception as e:
             logger.error(f"Failed to verify transaction {transaction_id}: {e} (Type: {type(e).__name__})", exc_info=True)
+            logger.debug(f"Debug: {request["verificationData"]}")
             logger.error(e)
             return None
 
