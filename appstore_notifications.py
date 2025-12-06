@@ -116,8 +116,9 @@ class AppStoreNotificationHandler:
             # Paging is needed if there are more.
             # We will process the first page which should contain the most relevant recent ones if sorted (API doesn't specify sort order definitively but usually chronological).
             # The API returns 'notificationHistory' list.
+            # Signature: get_notification_history(self, pagination_token, notification_history_request)
             
-            response = await client.get_notification_history(request)
+            response = await client.get_notification_history(pagination_token=None, notification_history_request=request)
             
             if response and response.notificationHistory:
                 logger.info(f"Found {len(response.notificationHistory)} notifications in history.")
@@ -148,8 +149,8 @@ class AppStoreNotificationHandler:
                         break
                         
                     # Fetch next page
-                    request.paginationToken = response.paginationToken
-                    response = await client.get_notification_history(request)
+                    # request.paginationToken = response.paginationToken # Not needed if passed as arg
+                    response = await client.get_notification_history(pagination_token=response.paginationToken, notification_history_request=request)
                     
                 logger.info(f"Successfully processed {count} historical notifications.")
                 
