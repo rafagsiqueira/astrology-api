@@ -118,18 +118,19 @@ class SubscriptionVerifier:
             raise("SubscriptionVerifier not fully initialized")
 
         transaction_id = request.get("transactionId")
+        signed_data = request.get("verificationData")
         logger.info(f"Verifying transaction {transaction_id} with Bundle ID: {self.bundle_id}, Environment: {self.environment}")
 
         try:
             # Verify and decode the signed transaction info
-            verified_transaction = self._verifier.verify_and_decode_signed_transaction(request["verificationData"])
+            verified_transaction = self._verifier.verify_and_decode_signed_transaction(signed_data)
             
             logger.debug(f"Verified transaction {verified_transaction}")
             return verified_transaction
             
         except Exception as e:
             logger.error(f"Failed to verify transaction {transaction_id}: {e} (Type: {type(e).__name__})", exc_info=True)
-            logger.debug(f"Debug: {request["verificationData"]}")
+            logger.error(f"Debug: {signed_data}")
             logger.error(e)
             return None
 
