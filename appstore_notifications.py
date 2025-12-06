@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import Request, HTTPException
 from appstoreserverlibrary.models.NotificationTypeV2 import NotificationTypeV2
 from appstoreserverlibrary.models.Subtype import Subtype
+from appstoreserverlibrary.models.Environment import Environment
 from appstoreserverlibrary.models.NotificationHistoryRequest import NotificationHistoryRequest
 from appstoreserverlibrary.models.NotificationHistoryResponse import NotificationHistoryResponse
 from subscription_verifier import SubscriptionVerifier
@@ -86,21 +87,21 @@ class AppStoreNotificationHandler:
             return
 
         try:
-            # Request history. We want the latest notifications.
-            # While the user asked for "latest 100", the API requires a start/end date or pagination token.
-            # We will ask for the last 3 days of notifications to be safe and just process them.
-            # There is no simple "last 100" without a date range.
-            # However, to be efficient, we can just ask for a recent window.
+            # Determine lookback window based on environment
+            # Sandbox: 30 days
+            # Production (and others): 180 days
+            history_days = 180
+            if verifier_wrapper.environment == Environment.SANDBOX:
+                history_days = 30
             
-            # Using a simplified approach: no date range = all history available (up to 180 days)
-            # but we probably shouldn't fetch everything. 
-            # Let's set start date to 7 days ago.
+            logger.info(f"Using {history_days}-day lookback window for environment: {verifier_wrapper.environment}")
+
             import time
             current_time = int(time.time() * 1000)
-            seven_days_ago = current_time - (7 * 24 * 60 * 60 * 1000)
+            start_date = current_time - (history_days * 24 * 60 * 60 * 1000)
 
             request = NotificationHistoryRequest(
-                startDate=seven_days_ago,
+                startDate=start_date,
                 endDate=current_time
             )
             
