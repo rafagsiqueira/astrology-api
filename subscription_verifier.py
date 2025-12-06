@@ -11,7 +11,18 @@ logger = get_logger(__name__)
 class SubscriptionVerifier:
     """Verifies App Store receipts and subscriptions."""
 
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SubscriptionVerifier, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self):
+        if self._initialized:
+            return
+            
         self.bundle_id = os.getenv("IOS_BUNDLE_ID", "com.rafasiqueira.avra")
         self.issuer_id = os.getenv("APP_STORE_ISSUER_ID")
         self.key_id = os.getenv("APP_STORE_KEY_ID")
@@ -21,6 +32,7 @@ class SubscriptionVerifier:
         
         self._client: Optional[AppStoreServerAPIClient] = None
         self._initialize_client()
+        self._initialized = True
 
     def _initialize_client(self):
         """Initialize the AppStoreServerAPIClient and SignedDataVerifier."""
@@ -61,6 +73,11 @@ class SubscriptionVerifier:
             if not root_certificates:
                 logger.warning("No Apple Root Certificates found.")
                 return
+
+            # Assert that we have the 3 expected root certificates
+            if len(root_certificates) != 3:
+                 logger.error(f"Expected 3 root certificates, found {len(root_certificates)}")
+            assert len(root_certificates) == 3, f"Expected 3 root certificates, but found {len(root_certificates)}"
 
             logger.info(f"Lenght of chain: {len(root_certificates)}")
 
