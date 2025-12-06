@@ -118,7 +118,7 @@ class AppStoreNotificationHandler:
             # The API returns 'notificationHistory' list.
             # Signature: get_notification_history(self, pagination_token, notification_history_request)
             
-            response = await client.get_notification_history(pagination_token=None, notification_history_request=request)
+            response = client.get_notification_history(pagination_token=None, notification_history_request=request)
             
             if response and response.notificationHistory:
                 logger.info(f"Found {len(response.notificationHistory)} notifications in history.")
@@ -150,7 +150,7 @@ class AppStoreNotificationHandler:
                         
                     # Fetch next page
                     # request.paginationToken = response.paginationToken # Not needed if passed as arg
-                    response = await client.get_notification_history(pagination_token=response.paginationToken, notification_history_request=request)
+                    response = client.get_notification_history(pagination_token=response.paginationToken, notification_history_request=request)
                     
                 logger.info(f"Successfully processed {count} historical notifications.")
                 
