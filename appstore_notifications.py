@@ -54,7 +54,7 @@ class AppStoreNotificationHandler:
             
             # Extract transaction info if available
             if notification.data and notification.data.signedTransactionInfo:
-                transaction_info = self.verifier.verify_and_decode_transaction(notification.data.signedTransactionInfo)
+                transaction_info = self.verifier.verify_and_decode_signed_transaction(notification.data.signedTransactionInfo)
                 
                 # Update subscription based on notification type
                 await self.subscription_service.update_subscription_from_transaction(
