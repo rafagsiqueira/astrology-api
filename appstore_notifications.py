@@ -83,8 +83,9 @@ class AppStoreNotificationHandler:
         verifier_wrapper = SubscriptionVerifier()
         
         # Skip fetching if environment is Xcode (not supported by AppStoreServerAPIClient)
-        if verifier_wrapper.environment == Environment.XCODE:
-            logger.info("Skipping notification fetch in Xcode environment.")
+        # Skip fetching if environment is not PRODUCTION
+        if verifier_wrapper.environment != Environment.PRODUCTION:
+            logger.info(f"Skipping notification fetch in non-Production environment: {verifier_wrapper.environment}")
             return
 
         client = await verifier_wrapper.get_api_client()
