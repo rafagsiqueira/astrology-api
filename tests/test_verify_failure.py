@@ -16,7 +16,7 @@ class TestVerificationFailure(unittest.TestCase):
         from routes import verify_subscription
         
         # Mock payload and user
-        request_payload = {"transactionId": "test_tx_123", "verificationData": "some_data"}
+        request_payload = {"transactionId": "test_tx_123", "verificationData": "some_data", "userId": "test_user_id"}
         user = {"uid": "test_user"}
         
         # Patch SubscriptionVerifier
