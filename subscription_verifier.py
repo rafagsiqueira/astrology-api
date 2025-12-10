@@ -32,11 +32,10 @@ class SubscriptionVerifier:
         self.environment = get_environment()
         
         self._client: Optional[AppStoreServerAPIClient] = None
-        self._initialize_client()
-        self._initialized = True
+        self._verifier: Optional[SignedDataVerifier] = None
 
-    def _initialize_client(self):
-        """Initialize the AppStoreServerAPIClient and SignedDataVerifier."""
+    def _initialize_api_client(self):
+        """Initialize the AppStoreServerAPIClient."""
         if not all([self.issuer_id, self.key_id, self.private_key, self.bundle_id]):
             logger.warning("App Store credentials missing. Receipt verification will fail.")
             return
@@ -52,7 +51,12 @@ class SubscriptionVerifier:
                 bundle_id=self.bundle_id,
                 environment=self.environment
             )
+        except ValueError as e:
+            logger.warn(f"Failed to initialize API client. Are you running on a valid environment?")
+            
 
+    def _initialize_data_verifier(self):
+        try:
             # Load Apple Root Certificates
             root_certificates = []
             
@@ -90,19 +94,20 @@ class SubscriptionVerifier:
                 enable_online_checks=True
             )
         except ValueError as e:
-            logger.warn(f"Failed to initialize API client. Are you running on a valid environment?")
-        except Exception as e:
-            logger.error(f"Failed to initialize SubscriptionVerifier: {e}")
+            logger.error(f"Failed to initialize Signed data verifier.")
+            raise e
 
     async def get_api_client(self) -> Optional[AppStoreServerAPIClient]:
         """Get the initialized AppStoreServerAPIClient instance."""
         if not self._client:
             # Try to re-initialize if missing (lazy loading attempt)
-             self._initialize_client()
+            self._initialize_api_client()
         return self._client
 
     def get_verifier(self) -> Optional[SignedDataVerifier]:
         """Get the initialized SignedDataVerifier instance."""
+        if not self._verifier:
+            self._initialize_data_verifier()
         return self._verifier
 
     async def verify_transaction(self, request: dict) -> JWSTransactionDecodedPayload:
@@ -120,12 +125,11 @@ class SubscriptionVerifier:
 
         logger.info(f"Verifying transaction {transaction_id} with Bundle ID: {self.bundle_id}, Environment: {self.environment}")
 
-        if not self._verifier:
-            raise("SubscriptionVerifier not fully initialized")
+        verifier = self.get_verifier()
 
         try:
             # Verify and decode the signed transaction info
-            verified_transaction = self._verifier.verify_and_decode_signed_transaction(signed_data)
+            verified_transaction = verifier.verify_and_decode_signed_transaction(signed_data)
             
             logger.debug(f"Verified transaction {verified_transaction}")
             return verified_transaction

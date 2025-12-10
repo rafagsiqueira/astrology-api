@@ -125,6 +125,7 @@ class SubscriptionService:
 
     async def update_subscription_from_transaction(
         self, 
+        user_id: str,
         transaction_info: JWSTransactionDecodedPayload, 
         notification_type: Optional[NotificationTypeV2] = None, 
         subtype: Optional[Subtype] = None
@@ -148,33 +149,12 @@ class SubscriptionService:
 
             original_transaction_id = transaction_info.originalTransactionId
             
-            # Find user associated with this original transaction ID
-            user_id = None
-            
             # First check if we already have a subscription with this original_transaction_id
             subscriptions_query = db.collection('subscriptions').where(
                 filter=FieldFilter('original_transaction_id', '==', original_transaction_id)
             ).limit(1)
             
             docs = subscriptions_query.get()
-            for doc in docs:
-                subscription_data = doc.to_dict()
-                user_id = subscription_data.get('user_id')
-                break
-            
-            # If not found via existing subscription, check the transaction's appAccountToken
-            if not user_id:
-                if hasattr(transaction_info, 'appAccountToken') and transaction_info.appAccountToken:
-                     user_id = transaction_info.appAccountToken
-                     logger.info(f"User ID {user_id} found in appAccountToken for {original_transaction_id}")
-            
-            if not user_id:
-                logger.warning(f"No user found for original transaction ID: {original_transaction_id}")
-                # In a real scenario, we might want to create a dangling subscription record 
-                # or log this for manual review if it's an INITIAL_BUY notification 
-                # but we don't know the user yet (e.g. if the app hasn't sent the receipt yet).
-                # For now, we can't update a user's subscription if we don't know who they are.
-                return False
 
             # Determine subscription status and type
             product_id = transaction_info.productId

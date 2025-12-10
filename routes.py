@@ -708,6 +708,9 @@ async def verify_subscription(
         raise HTTPException(status_code=400, detail="Transaction ID required")
 
     verifier = SubscriptionVerifier()
+    user_id = request.get("userId")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID required")
     verified_transaction: JWSTransactionDecodedPayload = await verifier.verify_transaction(request)
     
     if not verified_transaction:
@@ -718,7 +721,7 @@ async def verify_subscription(
         subscription_service = get_subscription_service()
         
         # Update subscription in Firestore
-        await subscription_service.update_subscription_from_transaction(verified_transaction)
+        await subscription_service.update_subscription_from_transaction(user_id, verified_transaction)
         
         return {"status": "verified", "transaction": verified_transaction}
         
