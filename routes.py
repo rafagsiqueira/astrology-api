@@ -1,7 +1,6 @@
 """API routes for the Avra application."""
 
 import asyncio
-import os
 import hashlib
 import json
 import traceback
@@ -10,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional, cast
 
 import openai
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from firebase_admin import firestore as firebase_firestore
 from google.cloud.firestore import FieldFilter
@@ -569,6 +568,33 @@ async def generate_chart_endpoint(
         raise HTTPException(status_code=503, detail="Personality analysis service not available")
     
     try:
+        # Get Firestore client
+        db = get_firestore_client()
+        if db:
+            # 1. Create or Update User Profile with Birth Data
+            # This ensures that even if a user deleted their data (but is still auth'd),
+            # generating a chart (Get Started) restores their profile state.
+            user_ref = db.collection('user_profiles').document(user['uid'])
+            
+            # Construct profile data from birth_data
+            profile_data = {
+                'birth_date': birth_data.birth_date, # Firestore accepts python datetime objects
+                'birth_time': birth_data.birth_time,
+                'latitude': birth_data.latitude,
+                'longitude': birth_data.longitude,
+                'place_id': birth_data.place_id,
+                'city': birth_data.city,
+                'country': birth_data.country,
+                'updated_at': firebase_firestore.SERVER_TIMESTAMP,
+            }
+            
+            # Use set(..., merge=True) to update existing or create new
+            user_ref.set(profile_data, merge=True)
+            logger.debug(f"User profile updated/created for user: {user['uid']}")
+            
+            # Also invalidate cache since we updated the source of truth
+            from profile_cache import cache
+            cache.invalidate(user['uid'])
 
         # Generate the chart
         chart = generate_birth_chart(birth_data)
@@ -593,6 +619,16 @@ async def generate_chart_endpoint(
         analysis = parse_chart_response(analysis_text)
         logger.debug("Chart generation completed successfully")
         chart.analysis = analysis
+        
+        # Save analysis to profile as well? 
+        # The user wanted "Get Started" to restore profile. Usually analysis is saved too.
+        if db:
+             user_ref.set({
+                 'astrological_chart': chart.model_dump(mode='json'),
+                 'personality_analysis': analysis.model_dump(mode='json')
+             }, merge=True)
+             logger.debug(f"Saved generated chart and analysis to profile for user: {user['uid']}")
+
         return chart
     except Exception as e:
         logger.error(f"Error generating chart: {e}")
@@ -827,6 +863,8 @@ async def chat_with_guru(
     """Chat with Avra."""
     logger.debug(f"Chat request from user: {user['uid']}")
 
+    #TODO: Sanitize request.message before proceeding
+
     openai_client = get_openai_client()
     if not openai_client:
         raise HTTPException(status_code=503, detail="Analysis service not available")
@@ -958,6 +996,153 @@ async def chat_with_guru(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Chat service error: {str(e)}")
 
+@router.post("/api/chat/voice")
+async def chat_with_voice(
+    file: UploadFile = File(...),
+    language: Optional[str] = Form(None),
+    user: dict = Depends(verify_firebase_token),
+):
+    """Chat with Avra using voice."""
+    logger.debug(f"Voice chat request from user: {user['uid']}")
+    
+    openai_client = get_openai_client()
+    if not openai_client:
+        raise HTTPException(status_code=503, detail="Analysis service not available")
+
+    # Transcribe audio
+    try:
+        # Pass the file-like object directly to OpenAI
+        # We use a tuple (filename, file_object) so OpenAI can detect the format
+        transcription_args = {
+            "model": "whisper-1",
+            "file": (file.filename or "audio.wav", file.file),
+        }
+        
+        if language:
+            transcription_args["language"] = language
+            
+        transcription = openai_client.audio.transcriptions.create(**transcription_args)
+        
+        user_message = transcription.text
+        logger.debug(f"Transcribed text: {user_message}")
+    except Exception as e:
+        logger.error(f"Error transcribing audio: {e}")
+        # Clean up any potential resource usage
+        try:
+             file.file.close() 
+        except:
+             pass
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+    # Reuse chat logic
+    db = get_firestore_client()
+    validate_database_availability()
+
+    subscription_service = get_subscription_service()
+    has_premium = await subscription_service.has_premium_access(user['uid'])
+
+    if not has_premium:
+        TOKEN_LIMIT = 7  # 5-7 sentences
+        usage = await get_user_token_usage(user['uid'], db)
+        sentences = count_sentences(user_message)
+        
+        if usage + sentences > TOKEN_LIMIT:
+            raise HTTPException(status_code=529, detail="You have exceeded your free message limit.")
+            return
+
+        await update_user_token_usage(user['uid'], usage + sentences, db)
+
+    try:
+        profile = get_user_profile_cached(user['uid'], db)
+        validate_user_profile(profile)
+        profile = await enhance_profile_with_chat_context(user['uid'], profile, db)
+        
+        assert db is not None, "Database client is None"
+        chat_history = await load_chat_history_from_firebase(user['uid'], db)
+        
+        if chat_history is None:
+            chat_history = create_chat_history_reducer()
+        
+        (system, user_context) = build_chat_context(profile_data=profile)
+        
+        async def generate_voice_response_stream():
+            # Send transcription event first
+            yield f"data: {json.dumps({'type': 'transcription', 'text': user_message})}\n\n"
+            
+            full_response = ""
+            final_usage = None
+            try:
+                with openai_client.responses.stream(
+                    model="gpt-4o-mini",
+                    max_output_tokens=2048,
+                    input=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": chat_history.to_prompt()},
+                        {"role": "user", "content": user_context},
+                        {"role": "user", "content": user_message}
+                    ]
+                ) as stream:
+                    for event in stream:
+                        if event.type == "response.output_text.delta":
+                            text = getattr(event, "delta", "")
+                            if text:
+                                full_response += text
+                                yield create_streaming_response_data(text)
+                        elif event.type == "response.error":
+                            error_message = getattr(event, "message", "OpenAI streaming error")
+                            logger.error(f"OpenAI streaming error: {error_message}")
+                            yield create_error_response_data(error_message)
+                    final_response = stream.get_final_response()
+                    final_usage = getattr(final_response, "usage", None)
+
+                if final_usage:
+                    analytics = get_analytics_service()
+                    await analytics.track_model_token_usage(
+                        endpoint="chat-voice",
+                        input_tokens=_get_usage_value(final_usage, "input_tokens"),
+                        output_tokens=_get_usage_value(final_usage, "output_tokens"),
+                        user_id=user['uid']
+                    )
+
+                if full_response:
+                    from semantic_kernel.contents import ChatMessageContent, AuthorRole
+                    u_msg = ChatMessageContent(role=AuthorRole.USER, content=user_message)
+                    a_msg = ChatMessageContent(role=AuthorRole.ASSISTANT, content=full_response)
+
+                    chat_history.add_message(u_msg)
+                    chat_history.add_message(a_msg)
+
+                    from chat_logic import save_chat_history_to_firebase
+                    await save_chat_history_to_firebase(user['uid'], chat_history, db)
+
+                yield f"data: {json.dumps({'type': 'message_stop'})}\n\n"
+
+            except openai.RateLimitError as exc:
+                analytics = get_analytics_service()
+                await analytics.track_model_rate_limit("chat", user['uid'])
+                error_message = "Rate limit exceeded. Please try again later."
+                logger.error(f"OpenAI rate limit during streaming: {exc}")
+                yield create_error_response_data(error_message)
+            except Exception as e:
+                logger.error(f"Error in chat streaming: {e}")
+                yield create_error_response_data(str(e))
+
+        return StreamingResponse(
+            generate_voice_response_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Cache-Control"
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in voice chat: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Chat service error: {str(e)}")
+
 @router.post("/api/get-daily-transits", response_model=DailyTransitResponse)
 async def get_daily_transits(
     request: DailyTransitRequest,
@@ -1072,25 +1257,38 @@ async def get_daily_transits(
             location_key,
         )
 
-        # Fetch weather forecasts for the requested range.
-        weather_forecasts_raw = await _fetch_weather_range(
-            effective_latitude,
-            effective_longitude,
-            target_date,
-            period_days,
-        )
-
         weather_forecasts_map: dict[str, DailyWeatherForecast] = {}
-        for key, value in weather_forecasts_raw.items():
-            if isinstance(value, DailyWeatherForecast):
-                weather_forecasts_map[key] = value
-            elif isinstance(value, dict):
-                try:
-                    weather_forecasts_map[key] = DailyWeatherForecast.model_validate(value)
-                except ValidationError:
-                    continue
+        
+        # Check cache for weather first
+        dates_needing_weather = []
+        for date_key in date_keys:
+            cached_data = cached_transits.get(date_key)
+            if cached_data and cached_data.get("weather"):
+                weather_forecasts_map[date_key] = cached_data["weather"]
             else:
-                continue
+                dates_needing_weather.append(date_key)
+
+        if dates_needing_weather:
+             # Fetch weather forecasts for the requested range if we are missing any.
+             # Since we currently only support 1 day, this simply runs if we miss it.
+             # If we supported ranges, we might need more complex logic or just fetch the whole range to be safe.
+            weather_forecasts_raw = await _fetch_weather_range(
+                effective_latitude,
+                effective_longitude,
+                target_date,
+                period_days,
+            )
+
+            for key, value in weather_forecasts_raw.items():
+                if isinstance(value, DailyWeatherForecast):
+                    weather_forecasts_map[key] = value
+                elif isinstance(value, dict):
+                    try:
+                        weather_forecasts_map[key] = DailyWeatherForecast.model_validate(value)
+                    except ValidationError:
+                        continue
+                else:
+                    continue
 
         missing_dates = [date_key for date_key in date_keys if date_key not in cached_transits]
         generated_transits: dict[str, dict] = {}

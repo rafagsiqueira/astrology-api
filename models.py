@@ -12,6 +12,9 @@ class BirthData(BaseModel):
     birth_time: str  # HH:MM format
     latitude: float
     longitude: float
+    place_id: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
     
     @field_validator('birth_date')
     @classmethod
