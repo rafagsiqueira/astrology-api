@@ -16,7 +16,6 @@ logging.basicConfig(
 )
 
 # Suppress verbose logs from third-party libraries
-logging.getLogger('openai').setLevel(logging.INFO)
 logging.getLogger('httpx').setLevel(logging.INFO)
 logging.getLogger('httpcore').setLevel(logging.INFO)
 logging.getLogger('root').setLevel(logging.INFO)
@@ -24,7 +23,7 @@ logging.getLogger('root').setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Environment variables
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')  # Add Gemini API Key
 FIRESTORE_DATABASE_ID = os.getenv('FIRESTORE_DATABASE_ID')
 WEATHERKIT_TEAM_ID = os.getenv('WEATHERKIT_TEAM_ID', 'F957AP9B34')
 WEATHERKIT_KEY_ID = os.getenv('WEATHERKIT_KEY_ID', '4PDNV2USTN')
@@ -47,13 +46,24 @@ def get_logger(name: str) -> logging.Logger:
     """Get a logger instance with the specified name."""
     return logging.getLogger(name)
 
-
-def get_openai_client():
-    """Initialise the OpenAI client if the API key is configured."""
+def get_gemini_client():
+    """Initialise the Google Gemini client if the API key is configured."""
     try:
-        if OPENAI_API_KEY:
-            from openai import OpenAI
-            return OpenAI(api_key=OPENAI_API_KEY)
+        if GEMINI_API_KEY:
+            # Patch SDK before use to fix timeout bug
+            from genai_patch import apply_patch
+            apply_patch()
+            
+            from google import genai
+            from google.genai import types
+            logger.info("Applying custom timeout of 60s to Gemini Client via patch")
+            return genai.Client(
+                api_key=GEMINI_API_KEY,
+                http_options=types.HttpOptions(timeout=60000) 
+            )
+        else:
+            logger.warning("GEMINI_API_KEY not found in environment variables")
     except Exception as exc:  # pragma: no cover - defensive logging
-        logger.error(f"Failed to initialise OpenAI client: {exc}")
+        logger.error(f"Failed to initialise Gemini client: {exc}")
     return None
+

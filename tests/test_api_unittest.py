@@ -53,6 +53,9 @@ class TestAPIEndpoints(unittest.TestCase):
         )
         self.mock_generate_tts = self.generate_tts_patcher.start()
 
+        self.analytics_patcher = patch('routes.get_analytics_service', return_value=AsyncMock())
+        self.mock_analytics = self.analytics_patcher.start()
+
     def tearDown(self):
         self.weather_patcher.stop()
         self.to_thread_patcher.stop()
@@ -63,6 +66,7 @@ class TestAPIEndpoints(unittest.TestCase):
         self.firestore_client_patcher.stop()
         self.weather_range_patcher.stop()
         self.generate_tts_patcher.stop()
+        self.analytics_patcher.stop()
 
     def test_root_endpoint(self):
         """Test the root health check endpoint"""
@@ -84,8 +88,7 @@ class TestAPIEndpoints(unittest.TestCase):
         
         with patch('routes.generate_birth_chart') as mock_generate:
             with patch('routes.build_birth_chart_context') as mock_build_context:
-                with patch('routes.parse_chart_response') as mock_parse_response:
-                    with patch('routes.get_openai_client') as mock_get_openai:
+                with patch('routes.get_gemini_client') as mock_get_gemini:
                         mock_chart = Mock()
                         mock_chart.model_dump.return_value = {
                             'planets': {},
@@ -99,31 +102,34 @@ class TestAPIEndpoints(unittest.TestCase):
                         mock_generate.return_value = mock_chart
                         mock_build_context.return_value = ("cached_context", "user_context")
                         
-                        mock_text_block = Mock(spec=TextBlock)
-                        mock_text_block.text = '"sun": {"influence": "test", "traits": []}'
-                        
-                        mock_usage = Mock()
-                        mock_usage.input_tokens = 100
-                        mock_usage.output_tokens = 50
-                        
                         mock_response = Mock()
-                        mock_response.output_text = '"sun": {"influence": "test", "traits": []}'
-                        mock_response.usage = mock_usage
-                        mock_response.stop_reason = 'end_turn'
+                        # Valid JSON matching ChartAnalysis model
+                        mock_response.text = '''
+                        {
+                            "sun": {"influence": "test", "traits": []},
+                            "moon": {"influence": "test", "traits": []},
+                            "ascendant": {"influence": "test", "traits": []},
+                            "mercury": {"influence": "test", "traits": []},
+                            "venus": {"influence": "test", "traits": []},
+                            "mars": {"influence": "test", "traits": []},
+                            "jupiter": {"influence": "test", "traits": []},
+                            "saturn": {"influence": "test", "traits": []},
+                            "uranus": {"influence": "test", "traits": []},
+                            "neptune": {"influence": "test", "traits": []},
+                            "pluto": {"influence": "test", "traits": []}
+                        }
+                        '''
+                        mock_response.usage_metadata = Mock(prompt_token_count=100, candidates_token_count=50)
                         
-                        mock_openai = Mock()
-                        mock_openai.responses.create.return_value = mock_response
-                        mock_get_openai.return_value = mock_openai
-                        
-                        from models import ChartAnalysis
-                        mock_parsed = Mock(spec=ChartAnalysis)
-                        mock_parse_response.return_value = mock_parsed
+                        mock_gemini = Mock()
+                        mock_gemini.models.generate_content.return_value = mock_response
+                        mock_get_gemini.return_value = mock_gemini
                         
                         result = asyncio.run(generate_chart_endpoint(birth_data, {'uid': 'test-user'}))
                         
                         mock_generate.assert_called_once_with(birth_data)
                         self.assertEqual(result, mock_chart)
-                        self.assertEqual(mock_chart.analysis, mock_parsed)
+                        self.assertIsNotNone(mock_chart.analysis)
 
     def test_generate_chart_endpoint_stores_chart(self):
         """Test that generate_chart_endpoint returns the chart (note: current implementation doesn't store)"""
@@ -140,39 +146,40 @@ class TestAPIEndpoints(unittest.TestCase):
         
         with patch('routes.generate_birth_chart') as mock_generate:
             with patch('routes.build_birth_chart_context') as mock_build_context:
-                with patch('routes.parse_chart_response') as mock_parse_response:
-                    with patch('routes.get_openai_client') as mock_get_openai:
+                with patch('routes.get_gemini_client') as mock_get_gemini:
                         mock_chart = Mock()
                         mock_chart_data = {'planets': {}, 'houses': {}}
                         mock_chart.model_dump.return_value = mock_chart_data
                         mock_generate.return_value = mock_chart
                         mock_build_context.return_value = ("cached_context", "user_context")
                         
-                        mock_text_block = Mock(spec=TextBlock)
-                        mock_text_block.text = '"sun": {"influence": "test", "traits": []}'
-                        
-                        mock_usage = Mock()
-                        mock_usage.input_tokens = 100
-                        mock_usage.output_tokens = 50
-                        
                         mock_response = Mock()
-                        mock_response.output_text = '"sun": {"influence": "test", "traits": []}'
-                        mock_response.usage = mock_usage
-                        mock_response.stop_reason = 'end_turn'
+                        mock_response.text = '''
+                        {
+                            "sun": {"influence": "test", "traits": []},
+                            "moon": {"influence": "test", "traits": []},
+                            "ascendant": {"influence": "test", "traits": []},
+                            "mercury": {"influence": "test", "traits": []},
+                            "venus": {"influence": "test", "traits": []},
+                            "mars": {"influence": "test", "traits": []},
+                            "jupiter": {"influence": "test", "traits": []},
+                            "saturn": {"influence": "test", "traits": []},
+                            "uranus": {"influence": "test", "traits": []},
+                            "neptune": {"influence": "test", "traits": []},
+                            "pluto": {"influence": "test", "traits": []}
+                        }
+                        '''
+                        mock_response.usage_metadata = Mock(prompt_token_count=100, candidates_token_count=50)
                         
-                        mock_openai = Mock()
-                        mock_openai.responses.create.return_value = mock_response
-                        mock_get_openai.return_value = mock_openai
-                        
-                        from models import ChartAnalysis
-                        mock_parsed = Mock(spec=ChartAnalysis)
-                        mock_parse_response.return_value = mock_parsed
+                        mock_gemini = Mock()
+                        mock_gemini.models.generate_content.return_value = mock_response
+                        mock_get_gemini.return_value = mock_gemini
                         
                         result = asyncio.run(generate_chart_endpoint(birth_data, user))
                         
                         mock_generate.assert_called_once_with(birth_data)
                         self.assertEqual(result, mock_chart)
-                        self.assertEqual(mock_chart.analysis, mock_parsed)
+                        self.assertIsNotNone(mock_chart.analysis)
 
     def test_analyze_personality_endpoint_integration(self):
         """Test that analyze_personality_endpoint properly calls business logic"""
@@ -186,13 +193,13 @@ class TestAPIEndpoints(unittest.TestCase):
             longitude=-74.0060
         )
         
-        with patch('routes.get_openai_client', return_value=None):
+        with patch('routes.get_gemini_client', return_value=None):
             with self.assertRaises(Exception):
                 asyncio.run(analyze_personality(analysis_request, {'uid': 'test'}))
         
         mock_user = {'uid': 'test-user', 'email': 'test@example.com'}
         
-        with patch('routes.get_openai_client') as mock_get_openai:
+        with patch('routes.get_gemini_client') as mock_get_gemini:
             with patch('contexts.generate_birth_chart') as mock_chart:
                 mock_chart_result = Mock()
                 mock_chart_result.planets = {}
@@ -200,6 +207,7 @@ class TestAPIEndpoints(unittest.TestCase):
                 mock_chart.return_value = mock_chart_result
                 
                 personality_payload = (
+                    '{'
                     '"overview": "Test overview",\n'
                     '"personality_traits": {\n'
                     '  "description": "Test personality traits description",\n'
@@ -232,26 +240,19 @@ class TestAPIEndpoints(unittest.TestCase):
                     '}'
                 )
 
-                mock_text_block = Mock(spec=TextBlock)
-                mock_text_block.text = personality_payload
-                mock_usage = Mock()
-                mock_usage.input_tokens = 100
-                mock_usage.output_tokens = 50
-                
                 mock_response = Mock()
-                mock_response.output_text = personality_payload
-                mock_response.usage = mock_usage
-                mock_response.stop_reason = 'end_turn'
+                mock_response.text = personality_payload
+                mock_response.usage_metadata = Mock(prompt_token_count=100, candidates_token_count=50)
                 
-                mock_openai = Mock()
-                mock_openai.responses.create.return_value = mock_response
-                mock_get_openai.return_value = mock_openai
+                mock_gemini = Mock()
+                mock_gemini.models.generate_content.return_value = mock_response
+                mock_get_gemini.return_value = mock_gemini
                 
                 asyncio.run(analyze_personality(analysis_request, mock_user))
                 
                 mock_chart.assert_called_once()
-                mock_get_openai.assert_called_once()
-                mock_openai.responses.create.assert_called_once()
+                mock_get_gemini.assert_called_once()
+                mock_gemini.models.generate_content.assert_called_once()
 
     def test_analyze_personality_endpoint_returns_analysis(self):
         """Test that analyze_personality_endpoint returns proper analysis"""
@@ -266,71 +267,35 @@ class TestAPIEndpoints(unittest.TestCase):
         )
         user = {'uid': 'test-user-123'}
         
-        with patch('routes.get_openai_client') as mock_get_openai:
+        with patch('routes.get_gemini_client') as mock_get_gemini:
             with patch('routes.build_personality_context') as mock_build_context:
-                with patch('routes.parse_personality_response') as mock_parse_response:
                     mock_build_context.return_value = ("Mocked system", "Mocked user message")
                     
-                    mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = '"overview": "Test analysis overview"'
-                    mock_usage = Mock()
-                    mock_usage.input_tokens = 100
-                    mock_usage.output_tokens = 50
-                    
                     mock_response = Mock()
-                    mock_response.output_text = '"overview": "Test analysis overview"'
-                    mock_response.usage = mock_usage
-                    mock_response.stop_reason = 'end_turn'
+                    mock_response.text = '''{
+                        "overview": "Test analysis overview",
+                        "personality_traits": { "description": "d", "key_traits": [] },
+                        "emotional_nature": { "description": "d", "emotional_characteristics": [] },
+                        "communication_and_intellect": { "description": "d", "communication_strengths": [] },
+                        "relationships_and_love": { "description": "d", "relationship_dynamics": [] },
+                        "career_and_purpose": { "description": "d", "career_potential": [] },
+                        "strengths_and_challenges": { "strengths": [], "challenges": [] },
+                        "life_path": { "overview": "d", "key_development_areas": [] }
+                    }'''
+                    mock_response.usage_metadata = Mock(prompt_token_count=100, candidates_token_count=50)
                     
-                    mock_openai = Mock()
-                    mock_openai.responses.create.return_value = mock_response
-                    mock_get_openai.return_value = mock_openai
+                    mock_gemini = Mock()
+                    mock_gemini.models.generate_content.return_value = mock_response
+                    mock_get_gemini.return_value = mock_gemini
                     
-                    from models import (
-                        PersonalityAnalysis, PersonalityTraitsSection, EmotionalNatureSection,
-                        CommunicationIntellectSection, RelationshipsLoveSection, CareerPurposeSection,
-                        StrengthsChallengesSection, LifePathSection
-                    )
-                    mock_analysis = PersonalityAnalysis(
-                        overview="Test analysis overview",
-                        personality_traits=PersonalityTraitsSection(
-                            description="Test personality traits description",
-                            key_traits=["Analytical", "Creative", "Empathetic"]
-                        ),
-                        emotional_nature=EmotionalNatureSection(
-                            description="Test emotional nature description",
-                            emotional_characteristics=["Sensitive", "Intuitive", "Balanced"]
-                        ),
-                        communication_and_intellect=CommunicationIntellectSection(
-                            description="Test communication description",
-                            communication_strengths=["Articulate", "Thoughtful", "Persuasive"]
-                        ),
-                        relationships_and_love=RelationshipsLoveSection(
-                            description="Test relationships description",
-                            relationship_dynamics=["Loyal", "Supportive", "Understanding"]
-                        ),
-                        career_and_purpose=CareerPurposeSection(
-                            description="Test career description",
-                            career_potential=["Leadership", "Innovation", "Service"]
-                        ),
-                        strengths_and_challenges=StrengthsChallengesSection(
-                            strengths=["Determination", "Creativity", "Empathy"],
-                            challenges=["Perfectionism", "Overthinking", "Sensitivity"]
-                        ),
-                        life_path=LifePathSection(
-                            overview="Test life path overview",
-                            key_development_areas=["Self-confidence", "Communication", "Balance"]
-                        )
-                    )
-                    mock_parse_response.return_value = mock_analysis
+                    mock_get_gemini.return_value = mock_gemini
                     
                     result = asyncio.run(analyze_personality(analysis_request, user))
                     
-                    self.assertEqual(result, mock_analysis)
-                    mock_get_openai.assert_called_once()
+                    self.assertEqual(result.overview, "Test analysis overview")
+                    mock_get_gemini.assert_called_once()
                     mock_build_context.assert_called_once_with(analysis_request)
-                    mock_openai.responses.create.assert_called_once()
-                    mock_parse_response.assert_called_once_with(mock_text_block.text)
+                    mock_gemini.models.generate_content.assert_called_once()
 
     def test_analyze_relationship_success(self):
         """Test successful relationship analysis with valid data"""
@@ -357,53 +322,45 @@ class TestAPIEndpoints(unittest.TestCase):
         auth_user = {'uid': 'test-user-123'}
         
         with patch('routes.build_relationship_context') as mock_build_context:
-            with patch('routes.get_openai_client') as mock_get_openai:
-                with patch('routes.parse_relationship_response') as mock_parse_response:
-                    with patch('routes.create_astrological_subject') as mock_create_subject:
-                        with patch('routes.RelationshipScoreFactory') as mock_score_factory:
-                            with patch('routes.generate_birth_chart') as mock_generate_chart:
-                                mock_build_context.return_value = ("Mocked system", "Mocked user message")
-                                mock_create_subject.return_value = Mock()
-                                mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=85, score_description="High", is_destiny_sign=True, aspects=[])
-                                mock_chart = Mock()
-                                mock_chart.light_svg = "<svg></svg>"
-                                mock_chart.dark_svg = "<svg></svg>"
-                                mock_generate_chart.return_value = mock_chart
-                                
-                                mock_text_block = Mock(spec=TextBlock)
-                                mock_text_block.text = "Mocked OpenAI response"
-                                
-                                mock_usage = Mock()
-                                mock_usage.input_tokens = 100
-                                mock_usage.output_tokens = 50
-                                
-                                mock_openai_response = Mock()
-                                mock_openai_response.output_text = "Mocked OpenAI response"
-                                mock_openai_response.usage = mock_usage
-                                mock_openai_response.stop_reason = 'end_turn'
-                                mock_get_openai.return_value.responses.create.return_value = mock_openai_response
-                                
-                                mock_parse_response.return_value = RelationshipAnalysis(
-                                    score=85,
-                                    overview="This is a powerful astrological connection with strong karmic ties.",
-                                    compatibility_level="Very High",
-                                    destiny_signs="Strong karmic connections present",
-                                    relationship_aspects=["Sun conjunction Moon", "Venus trine Mars"],
-                                    strengths=["Deep emotional understanding", "Natural compatibility"],
-                                    challenges=["Intensity may be overwhelming", "Need to maintain independence"],
-                                    areas_for_growth=["Embrace the connection while maintaining individual growth"]
-                                )
-                                
-                                result = asyncio.run(analyze_relationship(request, auth_user))
-                                
-                                self.assertEqual(result.score, 85)
-                                self.assertEqual(result.overview, "This is a powerful astrological connection with strong karmic ties.")
-                                self.assertEqual(result.compatibility_level, "Very High")
-                                self.assertEqual(result.destiny_signs, "Strong karmic connections present")
-                                self.assertEqual(result.relationship_aspects, ["Sun conjunction Moon", "Venus trine Mars"])
-                                self.assertEqual(result.strengths, ["Deep emotional understanding", "Natural compatibility"])
-                                self.assertEqual(result.challenges, ["Intensity may be overwhelming", "Need to maintain independence"])
-                                self.assertEqual(result.areas_for_growth, ["Embrace the connection while maintaining individual growth"])
+            with patch('routes.get_gemini_client') as mock_get_gemini:
+                with patch('routes.create_astrological_subject') as mock_create_subject:
+                    with patch('routes.RelationshipScoreFactory') as mock_score_factory:
+                        with patch('routes.generate_birth_chart') as mock_generate_chart:
+                            mock_build_context.return_value = ("Mocked system", "Mocked user message")
+                            mock_create_subject.return_value = Mock()
+                            mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=85, score_description="High", is_destiny_sign=True, aspects=[])
+                            mock_chart = Mock()
+                            mock_chart.light_svg = "<svg></svg>"
+                            mock_chart.dark_svg = "<svg></svg>"
+                            mock_generate_chart.return_value = mock_chart
+                            
+                            mock_response = Mock()
+                            mock_response.text = '''{
+                                "score": 85,
+                                "overview": "This is a powerful astrological connection with strong karmic ties.",
+                                "compatibility_level": "Very High",
+                                "destiny_signs": "Strong karmic connections present",
+                                "relationship_aspects": ["Sun conjunction Moon", "Venus trine Mars"],
+                                "strengths": ["Deep emotional understanding", "Natural compatibility"],
+                                "challenges": ["Intensity may be overwhelming", "Need to maintain independence"],
+                                "areas_for_growth": ["Embrace the connection while maintaining individual growth"]
+                            }'''
+                            mock_response.usage_metadata = Mock(prompt_token_count=100, candidates_token_count=50)
+                            
+                            mock_gemini = Mock()
+                            mock_gemini.models.generate_content.return_value = mock_response
+                            mock_get_gemini.return_value = mock_gemini
+                            
+                            result = asyncio.run(analyze_relationship(request, auth_user))
+                            
+                            self.assertEqual(result.score, 85)
+                            self.assertEqual(result.overview, "This is a powerful astrological connection with strong karmic ties.")
+                            self.assertEqual(result.compatibility_level, "Very High")
+                            self.assertEqual(result.destiny_signs, "Strong karmic connections present")
+                            self.assertEqual(result.relationship_aspects, ["Sun conjunction Moon", "Venus trine Mars"])
+                            self.assertEqual(result.strengths, ["Deep emotional understanding", "Natural compatibility"])
+                            self.assertEqual(result.challenges, ["Intensity may be overwhelming", "Need to maintain independence"])
+                            self.assertEqual(result.areas_for_growth, ["Embrace the connection while maintaining individual growth"])
 
     def test_analyze_relationship_structured_analysis_error(self):
         """Test relationship analysis when structured analysis fails"""
@@ -430,12 +387,18 @@ class TestAPIEndpoints(unittest.TestCase):
         auth_user = {'uid': 'test-user-123'}
         
         with patch('routes.build_relationship_context') as mock_build_context:
-            with patch('routes.get_openai_client') as mock_get_openai:
-                with patch('routes.parse_relationship_response') as mock_parse_response:
+            with patch('routes.get_gemini_client') as mock_get_gemini:
+                with patch('routes.create_astrological_subject'):
                     mock_build_context.return_value = ("Mocked system", "Mocked user message")
-                    mock_get_openai.return_value = None
-                    mock_parse_response.side_effect = Exception("Structured analysis failed")
+                    mock_get_gemini.return_value = Mock()
+                    # Make configured gemini call raise exception? Or return invalid JSON
+                    mock_gemini = Mock()
+                    mock_response = Mock()
+                    mock_response.text = "Invalid JSON"
+                    mock_gemini.models.generate_content.return_value = mock_response
+                    mock_get_gemini.return_value = mock_gemini
                     
+                    # model_validate_json will raise validation error on invalid JSON
                     with self.assertRaises(Exception):
                         asyncio.run(analyze_relationship(request, auth_user))
 
@@ -464,21 +427,10 @@ class TestAPIEndpoints(unittest.TestCase):
         auth_user = {'uid': 'test-user-123'}
         
         with patch('routes.build_relationship_context') as mock_build_context:
-            with patch('routes.get_openai_client') as mock_get_openai:
-                with patch('routes.parse_relationship_response') as mock_parse_response:
+            with patch('routes.get_gemini_client') as mock_get_gemini:
+                 
                     mock_build_context.return_value = ("Mocked system", "Mocked user message")
-                    mock_get_openai.return_value = None
-                    
-                    mock_parse_response.return_value = RelationshipAnalysis(
-                        score=60,
-                        overview="Analysis temporarily unavailable.",
-                        compatibility_level="Moderate",
-                        destiny_signs="No significant karmic connections detected",
-                        relationship_aspects=["Basic astrological compatibility"],
-                        strengths=["Basic compatibility analysis"],
-                        challenges=["Communication may require effort"],
-                        areas_for_growth=["Focus on understanding each other's perspectives"]
-                    )
+                    mock_get_gemini.return_value = None
                     
                     with self.assertRaises(Exception):
                         asyncio.run(analyze_relationship(request, auth_user))
@@ -536,46 +488,39 @@ class TestAPIEndpoints(unittest.TestCase):
         auth_user = {'uid': 'test-user-123'}
         
         with patch('routes.build_relationship_context') as mock_build_context:
-            with patch('routes.get_openai_client') as mock_get_openai:
-                with patch('routes.parse_relationship_response') as mock_parse_response:
-                    with patch('routes.create_astrological_subject') as mock_create_subject:
-                        with patch('routes.RelationshipScoreFactory') as mock_score_factory:
-                            with patch('routes.generate_birth_chart') as mock_generate_chart:
-                                mock_build_context.return_value = ("Mocked system", "Mocked user message")
-                                mock_create_subject.return_value = Mock()
-                                mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=35, score_description="Low", is_destiny_sign=False, aspects=[])
-                                mock_chart = Mock()
-                                mock_chart.light_svg = "https://test.com/chart.svg"
-                                mock_generate_chart.return_value = mock_chart
-                                
-                                mock_text_block = Mock(spec=TextBlock)
-                                mock_text_block.text = "Mocked OpenAI response for low score"
-                                
-                                mock_usage = Mock()
-                                mock_usage.input_tokens = 100
-                                mock_usage.output_tokens = 50
-                                
-                                mock_openai_response = Mock()
-                                mock_openai_response.output_text = "Mocked OpenAI response for low score"
-                                mock_openai_response.usage = mock_usage
-                                mock_openai_response.stop_reason = 'end_turn'
-                                mock_get_openai.return_value.responses.create.return_value = mock_openai_response
-                                
-                                mock_parse_response.return_value = RelationshipAnalysis(
-                                    score=35,
-                                    overview="This relationship may require significant effort to develop compatibility.",
-                                    compatibility_level="Low",
-                                    destiny_signs="No significant karmic connections",
-                                    relationship_aspects=["Limited harmonious aspects"],
-                                    strengths=["Opportunity for growth", "Learning from differences"],
-                                    challenges=["Different life approaches", "Communication barriers"],
-                                    areas_for_growth=["Focus on building understanding through patient communication"]
-                                )
-                                
-                                result = asyncio.run(analyze_relationship(request, auth_user))
-                                
-                                self.assertEqual(result.score, 35)
-                                self.assertIn("significant effort", result.overview)
+            with patch('routes.get_gemini_client') as mock_get_gemini:
+                with patch('routes.create_astrological_subject') as mock_create_subject:
+                    with patch('routes.RelationshipScoreFactory') as mock_score_factory:
+                        with patch('routes.generate_birth_chart') as mock_generate_chart:
+                            mock_build_context.return_value = ("Mocked system", "Mocked user message")
+                            mock_create_subject.return_value = Mock()
+                            mock_score_factory.return_value.get_relationship_score.return_value = Mock(score_value=35, score_description="Low", is_destiny_sign=False, aspects=[])
+                            mock_chart = Mock()
+                            mock_chart.light_svg = "https://test.com/chart.svg"
+                            mock_generate_chart.return_value = mock_chart
+                            
+                            mock_response = Mock()
+                            mock_response = Mock()
+                            mock_response.text = '''{
+                                "score": 35,
+                                "overview": "This relationship may require significant effort to develop compatibility.",
+                                "compatibility_level": "Low",
+                                "destiny_signs": "No significant karmic connections",
+                                "relationship_aspects": ["Limited harmonious aspects"],
+                                "strengths": ["Opportunity for growth", "Learning from differences"],
+                                "challenges": ["Different life approaches", "Communication barriers"],
+                                "areas_for_growth": ["Focus on building understanding through patient communication"]
+                            }'''
+                            mock_response.usage_metadata = Mock(prompt_token_count=100, candidates_token_count=50)
+                            
+                            mock_gemini = Mock()
+                            mock_gemini.models.generate_content.return_value = mock_response
+                            mock_get_gemini.return_value = mock_gemini
+                            
+                            result = asyncio.run(analyze_relationship(request, auth_user))
+                            
+                            self.assertEqual(result.score, 35)
+                            self.assertIn("significant effort", result.overview)
 
     def test_get_daily_transits_success(self):
         """Test successful daily transits request"""
@@ -600,7 +545,7 @@ class TestAPIEndpoints(unittest.TestCase):
             period=HoroscopePeriod.day
         )
         auth_user = {'uid': 'test-user-123'}
-        with patch('routes.get_openai_client') as mock_get_openai:
+        with patch('routes.get_gemini_client') as mock_get_gemini:
             with patch('routes.generate_transits') as mock_generate:
                 with patch('routes.diff_transits') as mock_diff:
                     from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
@@ -620,28 +565,20 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_generate.return_value = [mock_daily_transit]
                     mock_diff.return_value = [mock_transit_change]
 
-                    mock_text_block = Mock(spec=TextBlock)
                     current_date_str = datetime.now().strftime("%Y-%m-%d")
-                    mock_text_block.text = f'"messages": [{{"date": "{current_date_str}", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}}]}}'
+                    
+                    # Gemini returns parsed text directly if using response_schema, usually.
+                    # But here we probably use plain text response and expect JSON? 
+                    # routes.py uses `call_gemini_with_analytics`.
+                    mock_response = Mock()
+                    mock_response.text = f'[{{"date": "{current_date_str}", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}}]'
+                    mock_response.usage_metadata = Mock(prompt_token_count=100, candidates_token_count=50)
 
-                    mock_usage = Mock()
-                    mock_usage.input_tokens = 100
-                    mock_usage.output_tokens = 50
+                    mock_gemini = Mock()
+                    mock_gemini.models.generate_content.return_value = mock_response
+                    mock_get_gemini.return_value = mock_gemini
 
-                    mock_openai_response = Mock()
-                    mock_openai_response = Mock()
-                    mock_openai_response.output_text = f'"messages": [{{"date": "{current_date_str}", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}}]}}'
-                    mock_openai_response.usage = mock_usage
-                    mock_openai_response.stop_reason = 'end_turn'
-                    mock_client = mock_get_openai.return_value
-                    mock_client.responses.create.return_value = mock_openai_response
-
-                    mock_stream = MagicMock()
-                    mock_stream.__enter__.return_value = mock_stream
-                    mock_stream.iter_bytes.return_value = [b"fake-binary-audio"]
-                    mock_audio = Mock()
-                    mock_audio.with_streaming_response.create.return_value = mock_stream
-                    mock_client.audio = Mock(speech=mock_audio)
+                    # We mock generate_tts_audio at class level, so no need to mock OpenAI audio stream here.
 
                     self.mock_weather_range.return_value = {
                         datetime.now().strftime("%Y-%m-%d"): {
@@ -812,7 +749,7 @@ class TestAPIEndpoints(unittest.TestCase):
             'name': 'Test User'
         }
         
-        with patch('routes.get_openai_client') as mock_get_openai:
+        with patch('routes.get_gemini_client') as mock_get_gemini:
             with patch('routes.generate_transits') as mock_generate:
                 with patch('routes.diff_transits') as mock_diff:
                     from models import DailyTransit, DailyTransitChange, TransitChanges, RetrogradeChanges
@@ -830,18 +767,21 @@ class TestAPIEndpoints(unittest.TestCase):
                     mock_generate.return_value = [mock_transit]
                     mock_diff.return_value = [mock_change]
 
-                    mock_text_block = Mock(spec=TextBlock)
-                    mock_text_block.text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
+                    mock_response = Mock()
+                    mock_response.text = '[{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]'
+                    mock_response.usage_metadata = Mock(prompt_token_count=100, candidates_token_count=50)
+
+                    mock_gemini = Mock()
+                    mock_gemini.models.generate_content.return_value = mock_response
+                    mock_get_gemini.return_value = mock_gemini
+
+                    # Mock weather
+                    self.mock_weather_range.return_value = {}
 
                     mock_usage = Mock()
                     mock_usage.input_tokens = 100
                     mock_usage.output_tokens = 50
 
-                    mock_openai_response = Mock()
-                    mock_openai_response.output_text = '"messages": [{"date": "2024-01-01", "message": "Today is a good day for reflection.", "audioscript": "Today is a good day for reflection. The planetary alignments suggest introspection and inner wisdom."}]}'
-                    mock_openai_response.usage = mock_usage
-                    mock_openai_response.stop_reason = 'end_turn'
-                    mock_get_openai.return_value.responses.create.return_value = mock_openai_response
                     
                     result = asyncio.run(get_daily_transits(request, auth_user))
                     

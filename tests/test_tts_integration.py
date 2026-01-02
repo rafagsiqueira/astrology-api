@@ -7,7 +7,7 @@ import pytest
 from firebase_admin import storage
 
 from auth import initialize_firebase
-from config import get_openai_client
+from config import get_gemini_client
 from tts_service import generate_tts_audio
 from config import GCS_AUDIO_BUCKET
 
@@ -27,9 +27,9 @@ def test_generate_tts_audio_upload():
     except Exception as exc:  # pragma: no cover - environment-specific
         pytest.skip(f"Unable to verify Firebase Storage bucket: {exc}")
 
-    openai_client = get_openai_client()
-    if not openai_client:
-        pytest.skip("OpenAI client is not configured.")
+    gemini_client = get_gemini_client()
+    if not gemini_client:
+        pytest.skip("Gemini client is not configured.")
 
     script = os.getenv("TTS_TEST_SCRIPT", "Hello from the Avra TTS integration test.")
     user_id = os.getenv("TTS_TEST_USER_ID", "integration-test-user")
@@ -41,11 +41,11 @@ def test_generate_tts_audio_upload():
         user_id=user_id,
         date_key=date_key,
         message_id=message_id,
-        openai_client=openai_client,
+        gemini_client=gemini_client,
     )
 
     assert path, "Expected storage path for generated TTS audio"
-    assert audio_format == "mp3"
+    assert audio_format == "wav"
 
     if os.getenv("TTS_TEST_KEEP_BLOB") != "1":
         bucket = storage.bucket(GCS_AUDIO_BUCKET)

@@ -287,10 +287,10 @@ class RelationshipAnalysis(BaseModel):
     overview: str
     compatibility_level: str
     destiny_signs: str
-    relationship_aspects: list
-    strengths: list
-    challenges: list
-    areas_for_growth: list
+    relationship_aspects: List[str]
+    strengths: List[str]
+    challenges: List[str]
+    areas_for_growth: List[str]
     person1_light: Optional[str] = None
     person1_dark: Optional[str] = None
     person2_light: Optional[str] = None

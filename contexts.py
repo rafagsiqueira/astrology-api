@@ -68,6 +68,7 @@ def _normalize_structured_response(response: str) -> Dict[str, Any]:
 
     cleaned = _strip_code_fence(response)
     if not cleaned:
+        logger.error(f"Empty response after stripping code fence. Original: {response}")
         raise ValueError("Invalid response format")
 
     stripped = cleaned.lstrip()
@@ -96,18 +97,24 @@ def _normalize_structured_response(response: str) -> Dict[str, Any]:
 
     try:
         return json.loads(candidate)
-    except json.JSONDecodeError as json_error:
-        try:
-            parsed = yaml.safe_load(candidate)
-        except yaml.YAMLError as yaml_error:
-            logger.error("Failed to parse structured response as JSON: %s", json_error)
-            logger.debug("YAML parsing error detail: %s", yaml_error)
-            raise ValueError("Invalid response format") from json_error
-
         if isinstance(parsed, dict):
             return parsed
 
         logger.error("Structured response did not resolve to an object after YAML fallback.")
+        raise ValueError("Invalid response format") from json_error
+        
+    except json.JSONDecodeError as json_error:
+        # Fallback to YAML or error
+        logger.error(f"JSON key error: {json_error}. Candidate text: {candidate}")
+        try:
+            parsed = yaml.safe_load(candidate)
+            if isinstance(parsed, dict):
+                return parsed
+        except yaml.YAMLError as yaml_error:
+            logger.error("Failed to parse structured response as JSON: %s", json_error)
+            logger.debug("YAML parsing error detail: %s", yaml_error)
+            raise ValueError("Invalid response format") from json_error
+            
         raise ValueError("Invalid response format") from json_error
 
 def build_birth_chart_context(
@@ -227,32 +234,6 @@ def build_birth_chart_context(
 		PLANET_HOUSES=str(subject.planets),
 		ASCENDANT=str(subject.ascendant)
 	))
-
-def parse_chart_response(response: str) -> ChartAnalysis:
-	"""Parse the structured analysis response from Claude.
-	
-	Args:
-		response: The raw response string from Claude API.
-		
-	Returns:
-		ChartAnalysis: Parsed analysis content.
-
-	Raises:
-		ValueError: If the response format is invalid or parsing fails.
-	"""
-	try:
-		json_data = _normalize_structured_response(response)
-	except ValueError:
-		raise
-
-	try:
-		return ChartAnalysis(**json_data)
-	except ValidationError as e:
-		logger.error(f"Validation error while parsing personality analysis response: {e}")
-		raise ValueError("Error processing personality analysis response") from e
-	except Exception as e:
-		logger.error(f"Unexpected error while parsing personality analysis response: {e}")
-		raise ValueError("Error processing personality analysis response") from e
 
 def build_personality_context(
 	request: AnalysisRequest
@@ -381,32 +362,6 @@ def build_personality_context(
 	</birth_chart>
 	"""
 	return (system, user.format(BIRTH_CHART=chart.to_string()))
-
-def parse_personality_response(response: str) -> PersonalityAnalysis:
-	"""Parse the structured analysis response from Claude.
-	
-	Args:
-		response: The raw response string from Claude API.
-		
-	Returns:
-		PersonalityAnalysis: Parsed analysis content.
-
-	Raises:
-		ValueError: If the response format is invalid or parsing fails.
-	"""
-	try:
-		json_data = _normalize_structured_response(response)
-	except ValueError:
-		raise
-
-	try:
-		return PersonalityAnalysis(**json_data)
-	except ValidationError as e:
-		logger.error(f"Validation error while parsing personality analysis response: {e}")
-		raise ValueError("Error processing personality analysis response") from e
-	except Exception as e:
-		logger.error(f"Unexpected error while parsing personality analysis response: {e}")
-		raise ValueError("Error processing personality analysis response") from e
 
 def build_relationship_context(
 	chart_1: AstrologicalChart,
@@ -553,49 +508,6 @@ def build_relationship_context(
 		BIRTH_CHART_A=chart_1.to_string(),
 		BIRTH_CHART_B=chart_2.to_string()
 	))
-
-def parse_relationship_response(response: str) -> RelationshipAnalysis:
-	"""Parse the structured relationship analysis response from Claude.
-	
-	Args:
-		response: The raw response string from Claude API.
-		
-	Returns:
-		RelationshipAnalysis: Parsed analysis content.
-		
-	Raises:
-		ValueError: If the response format is invalid or parsing fails.
-	"""
-	try:
-		json_data = _normalize_structured_response(response)
-	except ValueError:
-		raise
-
-	try:
-		normalized_data = dict(json_data)
-		for field in (
-			'relationship_aspects',
-			'strengths',
-			'challenges',
-			'areas_for_growth'
-		):
-			if field in normalized_data:
-				normalized_data[field] = _coerce_string_list(normalized_data.get(field))
-
-		if 'score' in normalized_data and not isinstance(normalized_data['score'], int):
-			try:
-				normalized_data['score'] = int(normalized_data['score'])
-			except (TypeError, ValueError):
-				logger.warning("Unable to coerce relationship score to int; defaulting to 0")
-				normalized_data['score'] = 0
-
-		return RelationshipAnalysis(**normalized_data)
-	except ValidationError as e:
-		logger.error(f"Validation error while parsing personality analysis response: {e}")
-		raise ValueError("Error processing personality analysis response") from e
-	except Exception as e:
-		logger.error(f"Unexpected error while parsing personality analysis response: {e}")
-		raise ValueError("Error processing personality analysis response") from e
 
 def build_chat_context(profile_data: Dict[str, str]) -> tuple[str, str]:
 	"""Build the system context for Claude chat.
@@ -759,32 +671,6 @@ def build_composite_context(
 	"""
 	
 	return (system, user.format(COMPOSITE_CHART=composite_chart.to_string()))
-
-def parse_composite_response(response: str) -> CompositeAnalysis:
-	"""Parse the structured composite analysis response from Claude.
-	
-	Args:
-		response: The raw response string from Claude API.
-		
-	Returns:
-		CompositeAnalysis: Parsed analysis content.
-		
-	Raises:
-		ValueError: If the response format is invalid or parsing fails.
-	"""
-	try:
-		json_data = _normalize_structured_response(response)
-	except ValueError:
-		raise
-
-	try:
-		return CompositeAnalysis(**json_data)
-	except ValidationError as e:
-		logger.error(f"Validation error while parsing composite analysis response: {e}")
-		raise ValueError("Error processing composite analysis response") from e
-	except Exception as e:
-		logger.error(f"Unexpected error while parsing composite analysis response: {e}")
-		raise ValueError("Error processing composite analysis response") from e
 
 def build_daily_messages_context(
 	birth_data: BirthData,
@@ -1154,3 +1040,5 @@ def horoscopes_to_string(horoscopes_data: Optional[Any]) -> str:
 		return "No recent horoscope data available."
 	
 	return "\n\n".join(sections)
+
+

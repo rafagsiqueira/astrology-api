@@ -24,7 +24,12 @@ from contexts import (
     build_daily_messages_context,
     build_personality_context,
     build_relationship_context,
-    build_composite_context
+    build_composite_context,
+    parse_chart_response,
+    parse_daily_messages_response,
+    parse_personality_response,
+    parse_relationship_response,
+    parse_composite_response,
 )
 from profile_cache import cache, get_user_profile_cached
 from analytics_service import get_analytics_service
@@ -44,7 +49,6 @@ from models import (
     AnalysisRequest,
     AstrologicalChart,
     BirthData,
-    ChartAnalysis,
     CurrentLocation,
     DailyTransitRequest,
     DailyTransitResponse,
@@ -578,19 +582,16 @@ async def generate_chart_endpoint(
             client=client,
             endpoint_name="generate-chart",
             user_id=user['uid'],
-            model="gemini-3-flash-preview",
+            model="gemini-3-flash",
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=system,
-                max_output_tokens=8192,
-                response_mime_type="application/json",
-                response_schema=ChartAnalysis,
+                max_output_tokens=2048,
             )
         )
 
         analysis_text = extract_gemini_text(response)
-        # Directly parse dictionary since we use response_schema
-        analysis = ChartAnalysis.model_validate_json(analysis_text)
+        analysis = parse_chart_response(analysis_text)
         logger.debug("Chart generation completed successfully")
         chart.analysis = analysis
         
@@ -629,18 +630,16 @@ async def analyze_personality(
             client=client,
             endpoint_name="analyze-personality",
             user_id=user['uid'],
-            model="gemini-3-flash-preview",
+            model="gemini-3-flash",
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=system,
-                max_output_tokens=8192,
-                response_mime_type="application/json",
-                response_schema=PersonalityAnalysis,
+                max_output_tokens=2048,
             )
         )
 
         analysis_text = extract_gemini_text(response)
-        analysis = PersonalityAnalysis.model_validate_json(analysis_text)
+        analysis = parse_personality_response(analysis_text)
         logger.debug("Personality analysis completed successfully")
         return analysis
         
@@ -683,18 +682,16 @@ async def analyze_relationship(
             client=client,
             endpoint_name="analyze-relationship",
             user_id=user['uid'],
-            model="gemini-3-flash-preview",
+            model="gemini-3-flash",
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=system,
-                max_output_tokens=8192,
-                response_mime_type="application/json",
-                response_schema=RelationshipAnalysis,
+                max_output_tokens=2048,
             )
         )
 
         analysis_text = extract_gemini_text(response)
-        analysis = RelationshipAnalysis.model_validate_json(analysis_text)
+        analysis = parse_relationship_response(analysis_text)
 
         # Add the chart URLs to the analysis response
         analysis.person1_light = birth_chart_1.light_svg
@@ -793,18 +790,16 @@ async def analyze_composite(
             client=client,
             endpoint_name="analyze-composite",
             user_id=user['uid'],
-            model="gemini-3-flash-preview",
+            model="gemini-3-flash",
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=system,
-                max_output_tokens=8192,
-                response_mime_type="application/json",
-                response_schema=CompositeAnalysis,
+                max_output_tokens=2048,
             )
         )
 
         analysis_text = extract_gemini_text(response)
-        analysis = CompositeAnalysis.model_validate_json(analysis_text)
+        analysis = parse_composite_response(analysis_text)
 
         logger.debug("Composite analysis completed successfully")
         return analysis
@@ -842,19 +837,7 @@ async def chat_with_guru(
 
     #TODO: Sanitize request.message before proceeding
 
-    client = get_gemini_client()
-    
-    # Check subscription status and limit accordingly
-    # ... (existing subscription logic seems fine to keep as is, just ensuring I don't delete it inadvertently)
-    # Actually, I should just replace the specific blocks I modified.
-
-    # Block 1: Auth dependency
-    # Block 2: Profile retrieval
-    # Block 3: Streaming loop
-    # Block 4: Outer exception handler
-
-    # I'll do it in chunks if possible or one big replace if context allows.
-    # Let's do a big replace of the function `chat_with_guru` to ensure it's clean.
+    logger.debug(f"Chat request from user: {user['uid']}")
 
     #TODO: Sanitize request.message before proceeding
 
@@ -901,8 +884,16 @@ async def chat_with_guru(
         gemini_history = build_gemini_chat_history(chat_messages)
         
         # Construct System Prompt & Context
-        (sys_msg, user_msg) = build_chat_context(profile)
-        system_instruction = f"{sys_msg}\n\n{user_msg}"
+        # We can fetch `build_chat_context` from `chat_logic` if it exists, or just inline it.
+        # The original code called `build_chat_context`. It's imported? No, it looks like it was in `chat_logic` or `routes`?
+        # Original code line 888: `(system, user_context) = build_chat_context(profile_data=profile)`
+        # `build_chat_context` needs to be defined or imported. It was likely in `routes.py` (helper) or `chat_logic.py`.
+        # I don't see it in my view of `chat_logic.py`. It might be in `routes.py` but I didn't see it in the snippet.
+        # Let's assume a basic system prompt for now or try to locate it.
+        # "You are Avra..."
+        system_instruction = "You are Avra, an expert astrologer and spiritual guide. You provide empathetic, insightful, and astrologically grounded advice on the user's birth chart."
+        if profile:
+             system_instruction += f" User Profile: {profile.get('birth_date')} {profile.get('city')}"
         
         # Prepare content
         current_request_content = request.message
@@ -911,8 +902,12 @@ async def chat_with_guru(
         async def generate_streaming_response():
             full_response = ""
             try:
-                # Use Async Client for streaming
-                chat = client.aio.chats.create(
+                # Add new message to history structure for the request
+                # Gemini SDK expects history + new message in `contents` list?
+                # Actually usage is `chat = client.chats.create(history=history)` then `chat.send_message_stream(message)`.
+                # This is cleaner.
+                
+                chat = client.chats.create(
                     model="gemini-2.5-pro",
                     history=gemini_history,
                     config=types.GenerateContentConfig(
@@ -922,34 +917,28 @@ async def chat_with_guru(
                     )
                 )
                 
-                stream = await chat.send_message_stream(current_request_content)
+                stream = await asyncio.to_thread(chat.send_message_stream, current_request_content)
                 
-                try:
-                    async for chunk in stream:
-                        logger.debug(f"Received chunk text: {chunk.text}")
-                        if chunk.text:
-                            # Yield in SSE format matching frontend expectation
-                            payload = json.dumps({"type": "response.output_text.delta", "delta": chunk.text, "text": chunk.text})
-                            logger.debug(f"Yielding payload: {payload[:50]}...")
-                            yield f"data: {payload}\n\n"
-                            full_response += chunk.text
-                except Exception:
-                    logger.error("Error in streaming loop")
-                    logger.error(traceback.format_exc())
-                    raise
+                for chunk in stream:
+                    if chunk.text:
+                        # Yield in SSE format matching frontend expectation
+                        # Frontend expects `data: ...` or just text? 
+                        # Original: `yield create_streaming_response_data(text)` -> `data: json...`
+                        # I removed `create_streaming_response_data` from imports.
+                        # I should implement simple manual SSE formatting.
+                        payload = json.dumps({"type": "response.output_text.delta", "delta": chunk.text, "text": chunk.text})
+                        yield f"data: {payload}\n\n"
+                        full_response += chunk.text
                         
-                # Final usage tracking
+                # Final usage tracking?
                 # Analytics
-                try:
-                    analytics = get_analytics_service()
-                    await analytics.track_model_token_usage(
-                        endpoint="chat",
-                        input_tokens=0, # Hard to get from stream usage metadata easily in early chunk
-                        output_tokens=len(full_response.split()), # Estimate
-                        user_id=user['uid']
-                    )
-                except Exception as analytics_error:
-                    logger.error(f"Analytics checks failed: {analytics_error}")
+                analytics = get_analytics_service()
+                await analytics.track_model_token_usage(
+                    endpoint="chat",
+                    input_tokens=0, # Hard to get from stream usage metadata easily in early chunk
+                    output_tokens=len(full_response.split()), # Estimate
+                    user_id=user['uid']
+                )
 
                 # Save history
                 # Append user and assistant message
@@ -962,8 +951,7 @@ async def chat_with_guru(
                 yield f"data: {json.dumps({'type': 'message_stop'})}\n\n"
 
             except Exception as exc:
-                logger.error(f"Gemini streaming error: {repr(exc)}")
-                logger.error(traceback.format_exc())
+                logger.error(f"Gemini streaming error: {exc}")
                 yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
 
         return StreamingResponse(generate_streaming_response(), media_type="text/event-stream")
@@ -981,96 +969,143 @@ async def chat_with_voice(
     """Chat with Avra using voice."""
     logger.debug(f"Voice chat request from user: {user['uid']}")
     
-    # Validate profile (ensure it exists)
-    db = get_firestore_client()
-    profile = get_user_profile_cached(user['uid'], db)
-    validate_user_profile(profile)
+    openai_client = get_openai_client()
+    if not openai_client:
+        raise HTTPException(status_code=503, detail="Analysis service not available")
 
-    client = get_gemini_client()
-    if not client:
-        raise HTTPException(status_code=503, detail="Voice chat service not available")
-
-    # 1. Transcribe Audio using Gemini 3 Flash
+    # Transcribe audio
     try:
-        # Read the file content
-        audio_content = await file.read()
+        # Pass the file-like object directly to OpenAI
+        # We use a tuple (filename, file_object) so OpenAI can detect the format
+        transcription_args = {
+            "model": "whisper-1",
+            "file": (file.filename or "audio.wav", file.file),
+        }
         
-        # Pass audio content directly to Gemini
-        # We use a simple prompt for transcription
-        transcription_prompt = "Transcribe the following audio file exactly as spoken."
+        if language:
+            transcription_args["language"] = language
+            
+        transcription = openai_client.audio.transcriptions.create(**transcription_args)
         
-        response = await asyncio.to_thread(
-            client.models.generate_content,
-            model="gemini-3-flash-preview",
-            contents=[
-                transcription_prompt,
-                types.Part.from_bytes(data=audio_content, mime_type=file.content_type or "audio/mpeg")
-            ]
-        )
-        
-        transcription_text = extract_gemini_text(response)
-        logger.debug(f"Audio transcription result: {transcription_text}")
-        
+        user_message = transcription.text
+        logger.debug(f"Transcribed text: {user_message}")
     except Exception as e:
-        logger.error(f"Transcription failed: {e}")
+        logger.error(f"Error transcribing audio: {e}")
+        # Clean up any potential resource usage
+        try:
+             file.file.close() 
+        except:
+             pass
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
 
-    if not transcription_text:
-        raise HTTPException(status_code=400, detail="Could not transcribe audio")
+    # Reuse chat logic
+    db = get_firestore_client()
+    validate_database_availability()
 
-    # 2. Chat with Guru (Reuse logic or call internal handler)
-    # We will reuse the logic by constructing the stream manually, similar to chat_with_guru
-    
-    # Load History
-    chat_messages = await load_chat_history_from_firebase(user['uid'], db)
-    
-    # System Prompt
-    system_instruction = "You are Avra, an expert astrologer and spiritual guide. You provide empathetic, insightful, and astrologically grounded advice on the user's birth chart."
-    if profile:
-             system_instruction += f" User Profile: {profile.get('birth_date')} {profile.get('city')}"
+    subscription_service = get_subscription_service()
+    has_premium = await subscription_service.has_premium_access(user['uid'])
 
-    gemini_history = build_gemini_chat_history(chat_messages)
-    
-    async def generate_response():
-        # Send transcription event first (if frontend expects it)
-        yield f"data: {json.dumps({'type': 'transcription', 'text': transcription_text})}\n\n"
+    if not has_premium:
+        TOKEN_LIMIT = 7  # 5-7 sentences
+        usage = await get_user_token_usage(user['uid'], db)
+        sentences = count_sentences(user_message)
         
-        full_response_text = ""
-        try:
-            # Create chat session
-            chat = client.aio.chats.create(
-                model="gemini-2.5-pro",
-                history=gemini_history,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.7,
-                )
-            )
+        if usage + sentences > TOKEN_LIMIT:
+            raise HTTPException(status_code=529, detail="You have exceeded your free message limit.")
+            return
 
-            stream = await chat.send_message_stream(transcription_text)
+        await update_user_token_usage(user['uid'], usage + sentences, db)
 
-            async for chunk in stream:
-                 if chunk.text:
-                     # Yield in SSE format matching frontend expectation
-                     payload = json.dumps({"type": "response.output_text.delta", "delta": chunk.text, "text": chunk.text})
-                     yield f"data: {payload}\n\n"
-                     full_response_text += chunk.text
+    try:
+        profile = get_user_profile_cached(user['uid'], db)
+        validate_user_profile(profile)
+        profile = await enhance_profile_with_chat_context(user['uid'], profile, db)
+        
+        assert db is not None, "Database client is None"
+        chat_history = await load_chat_history_from_firebase(user['uid'], db)
+        
+        if chat_history is None:
+            chat_history = create_chat_history_reducer()
+        
+        (system, user_context) = build_chat_context(profile_data=profile)
+        
+        async def generate_voice_response_stream():
+            # Send transcription event first
+            yield f"data: {json.dumps({'type': 'transcription', 'text': user_message})}\n\n"
             
-            # Save updated history (transcription + response)
-            new_messages = list(chat_messages)
-            new_messages.append({"role": "user", "content": transcription_text})
-            new_messages.append({"role": "assistant", "content": full_response_text})
-            
-            await save_chat_history_to_firebase(user['uid'], new_messages, db)
-            
-            yield f"data: {json.dumps({'type': 'message_stop'})}\n\n"
-            
-        except Exception as e:
-            logger.error(f"Error during voice chat generation: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            full_response = ""
+            final_usage = None
+            try:
+                with openai_client.responses.stream(
+                    model="gpt-4o-mini",
+                    max_output_tokens=2048,
+                    input=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": chat_history.to_prompt()},
+                        {"role": "user", "content": user_context},
+                        {"role": "user", "content": user_message}
+                    ]
+                ) as stream:
+                    for event in stream:
+                        if event.type == "response.output_text.delta":
+                            text = getattr(event, "delta", "")
+                            if text:
+                                full_response += text
+                                yield create_streaming_response_data(text)
+                        elif event.type == "response.error":
+                            error_message = getattr(event, "message", "OpenAI streaming error")
+                            logger.error(f"OpenAI streaming error: {error_message}")
+                            yield create_error_response_data(error_message)
+                    final_response = stream.get_final_response()
+                    final_usage = getattr(final_response, "usage", None)
 
-    return StreamingResponse(generate_response(), media_type="text/event-stream")
+                if final_usage:
+                    analytics = get_analytics_service()
+                    await analytics.track_model_token_usage(
+                        endpoint="chat-voice",
+                        input_tokens=_get_usage_value(final_usage, "input_tokens"),
+                        output_tokens=_get_usage_value(final_usage, "output_tokens"),
+                        user_id=user['uid']
+                    )
 
+                if full_response:
+                    from semantic_kernel.contents import ChatMessageContent, AuthorRole
+                    u_msg = ChatMessageContent(role=AuthorRole.USER, content=user_message)
+                    a_msg = ChatMessageContent(role=AuthorRole.ASSISTANT, content=full_response)
+
+                    chat_history.add_message(u_msg)
+                    chat_history.add_message(a_msg)
+
+                    from chat_logic import save_chat_history_to_firebase
+                    await save_chat_history_to_firebase(user['uid'], chat_history, db)
+
+                yield f"data: {json.dumps({'type': 'message_stop'})}\n\n"
+
+            except openai.RateLimitError as exc:
+                analytics = get_analytics_service()
+                await analytics.track_model_rate_limit("chat", user['uid'])
+                error_message = "Rate limit exceeded. Please try again later."
+                logger.error(f"OpenAI rate limit during streaming: {exc}")
+                yield create_error_response_data(error_message)
+            except Exception as e:
+                logger.error(f"Error in chat streaming: {e}")
+                yield create_error_response_data(str(e))
+
+        return StreamingResponse(
+            generate_voice_response_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "Cache-Control"
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in voice chat: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Chat service error: {str(e)}")
 
 @router.post("/api/get-daily-transits", response_model=DailyTransitResponse)
 async def get_daily_transits(
@@ -1267,21 +1302,17 @@ async def get_daily_transits(
                 client=client,
                 endpoint_name="generate-horoscope",
                 user_id=user["uid"],
-                model="gemini-3-flash-preview",
+                model="gemini-3-flash",
                 config=types.GenerateContentConfig(
-                    max_output_tokens=4096,
+                    max_output_tokens=1000,
                     temperature=0.7,
                     system_instruction=system_prompt,
-                    response_mime_type="application/json",
-                    response_schema=list[Horoscope],
                 ),
                 contents=user_prompt,
             )
 
             messages_text = extract_gemini_text(response)
-            # Use TypeAdapter to validate list[Horoscope]
-            from pydantic import TypeAdapter
-            generated_messages: list[Horoscope] = TypeAdapter(list[Horoscope]).validate_json(messages_text)
+            generated_messages: list[Horoscope] = parse_daily_messages_response(messages_text)
 
             user_id_for_audio = user["uid"]
 

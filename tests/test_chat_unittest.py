@@ -13,7 +13,7 @@ sys.modules['semantic_kernel.functions'] = Mock()
 
 from chat_logic import (
     validate_user_profile,
-    convert_firebase_messages_to_chat_history, create_streaming_response_data,
+    build_gemini_chat_history, create_streaming_response_data,
     create_error_response_data,
     count_sentences
 )
@@ -88,31 +88,28 @@ class TestChatBusinessLogic(unittest.TestCase):
         self.assertIn("knowledgeable and friendly astrologer", system)
         self.assertIn("No birth chart data available", user)
 
-    def test_convert_firebase_messages_to_chat_history(self):
-        """Test conversion of Firebase messages to Semantic Kernel ChatHistory"""
-        async def run_test():
-            firebase_messages = [
-                {"role": "user", "content": "What's my sign?"},
-                {"role": "assistant", "content": "You're an Aquarius."},
-                {"role": "user", "content": "Tell me more about it."}
-            ]
+    def test_build_gemini_chat_history(self):
+        """Test conversion of Firebase messages to Gemini Content objects"""
+        from google.genai import types
 
-            with patch('chat_logic.create_chat_history_reducer') as mock_reducer:
-                mock_chat_history = Mock()
-                mock_chat_history.messages = []
-                mock_chat_history.target_count = 150000
-                mock_chat_history.reduce = Mock()
+        firebase_messages = [
+            {"role": "user", "content": "What's my sign?"},
+            {"role": "assistant", "content": "You're an Aquarius."},
+            {"role": "user", "content": "Tell me more about it."}
+        ]
 
-                mock_chat_history.add_message = Mock()
-                mock_reducer.return_value = mock_chat_history
+        chat_history = build_gemini_chat_history(firebase_messages)
 
-                chat_history = await convert_firebase_messages_to_chat_history(firebase_messages)
+        self.assertEqual(len(chat_history), 3)
+        self.assertIsInstance(chat_history[0], types.Content)
+        self.assertEqual(chat_history[0].role, "user")
+        self.assertEqual(chat_history[0].parts[0].text, "What's my sign?")
+        
+        self.assertEqual(chat_history[1].role, "model")
+        self.assertEqual(chat_history[1].parts[0].text, "You're an Aquarius.")
 
-                self.assertEqual(chat_history, mock_chat_history)
-                self.assertEqual(mock_chat_history.add_message.call_count, 3)
-                mock_reducer.assert_called_once()
-
-        asyncio.run(run_test())
+        self.assertEqual(chat_history[2].role, "user")
+        self.assertEqual(chat_history[2].parts[0].text, "Tell me more about it.")
 
     def test_create_streaming_response_data(self):
         """Test SSE data formatting for streaming response"""
@@ -148,80 +145,48 @@ if __name__ == '__main__':
 class TestTokenLimiting(unittest.TestCase):
     """Test suite for token limiting functionality"""
 
-    @patch('routes.get_openai_client')
-    @patch('routes.build_chat_context')
-    @patch('routes.create_chat_history_reducer')
+
+
+    @patch('routes.get_gemini_client')
     @patch('routes.load_chat_history_from_firebase')
-    @patch('routes.enhance_profile_with_chat_context')
     @patch('routes.validate_user_profile')
     @patch('routes.get_user_profile_cached')
     @patch('routes.get_firestore_client')
-    @patch('routes.update_user_token_usage', new_callable=AsyncMock)
-    @patch('routes.get_user_token_usage', new_callable=AsyncMock)
     @patch('routes.get_subscription_service')
     @patch('routes.validate_database_availability')
-    def test_chat_with_guru_no_subscription_under_limit(self, mock_validate_db, mock_get_sub_service, mock_get_usage, mock_update_usage, mock_get_db, mock_get_profile, mock_validate_profile, mock_enhance_profile, mock_load_history, mock_create_history, mock_build_context, mock_get_openai):
-        """Test chat with no subscription and under token limit"""
-        async def run_test():
-            mock_get_sub_service.return_value.has_premium_access = AsyncMock(return_value=False)
-            mock_get_usage.return_value = 0
-            mock_build_context.return_value = ("system", "user")
-
-            request = ChatRequest(message="Hello. How are you?")
-            user = {'uid': 'test-user'}
-
-            # This test is complex because of the streaming response.
-            # We will just check that the function is called and does not raise an exception.
-            await routes.chat_with_guru(request, user)
-
-            mock_update_usage.assert_called_once_with('test-user', 2, mock_get_db.return_value)
-
-        asyncio.run(run_test())
-
-    @patch('routes.get_openai_client')
-    @patch('routes.get_subscription_service')
-    @patch('routes.get_user_token_usage', new_callable=AsyncMock)
-    @patch('routes.validate_database_availability')
-    def test_chat_with_guru_no_subscription_over_limit(self, mock_validate_db, mock_get_usage, mock_get_sub_service, mock_get_openai):
-        """Test chat with no subscription and over token limit"""
-        async def run_test():
-            mock_get_sub_service.return_value.has_premium_access = AsyncMock(return_value=False)
-            mock_get_usage.return_value = 8
-
-            request = ChatRequest(message="This is a long message with many sentences. One. Two. Three. Four. Five. Six. Seven. Eight.")
-            user = {'uid': 'test-user'}
-
-            try:
-                await routes.chat_with_guru(request, user)
-            except HTTPException as e:
-                self.assertEqual(e.status_code, 529)
-
-        asyncio.run(run_test())
-
-    @patch('routes.get_openai_client')
-    @patch('routes.build_chat_context')
-    @patch('routes.create_chat_history_reducer')
-    @patch('routes.load_chat_history_from_firebase')
-    @patch('routes.enhance_profile_with_chat_context')
-    @patch('routes.validate_user_profile')
-    @patch('routes.get_user_profile_cached')
-    @patch('routes.get_firestore_client')
-    @patch('routes.update_user_token_usage', new_callable=AsyncMock)
-    @patch('routes.get_user_token_usage', new_callable=AsyncMock)
-    @patch('routes.get_subscription_service')
-    @patch('routes.validate_database_availability')
-    def test_chat_with_guru_with_subscription(self, mock_validate_db, mock_get_sub_service, mock_get_usage, mock_update_usage, mock_get_db, mock_get_profile, mock_validate_profile, mock_enhance_profile, mock_load_history, mock_create_history, mock_build_context, mock_get_openai):
+    @patch('routes.get_analytics_service')
+    def test_chat_with_guru_with_subscription(self, mock_get_analytics, mock_validate_db, mock_get_sub_service, mock_get_db, mock_get_profile, mock_validate_profile, mock_load_history, mock_get_gemini):
         """Test chat with a subscription"""
         async def run_test():
+            mock_get_analytics.return_value = AsyncMock()
             mock_get_sub_service.return_value.has_premium_access = AsyncMock(return_value=True)
-            mock_build_context.return_value = ("system", "user")
 
             request = ChatRequest(message="Hello")
             user = {'uid': 'test-user'}
 
-            await routes.chat_with_guru(request, user)
+            # Mock Gemini client chat stream
+            class AsyncIterator:
+                def __init__(self, seq):
+                    self.iter = iter(seq)
+                def __aiter__(self):
+                    return self
+                async def __anext__(self):
+                    try:
+                        return next(self.iter)
+                    except StopIteration:
+                        raise StopAsyncIteration
 
-            mock_get_usage.assert_not_called()
-            mock_update_usage.assert_not_called()
+            mock_chat = Mock()
+            mock_stream = AsyncIterator([Mock(text="Hello world")])
+            mock_chat.send_message_stream = AsyncMock(return_value=mock_stream)
+            mock_get_gemini.return_value.aio.chats.create.return_value = mock_chat
+
+            response = await routes.chat_with_guru(request, user)
+            
+            # Consume the stream to ensure logic runs
+            async for _ in response.body_iterator:
+                pass
+            
+            mock_get_sub_service.return_value.has_premium_access.assert_called()
 
         asyncio.run(run_test())

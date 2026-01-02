@@ -42,15 +42,20 @@ def create_audio_blob(
     return bucket.blob(blob_name), blob_name
 
 
+
+import wave
+import io
+from google.genai import types
+
 def generate_tts_audio(
     *,
     script: str,
     user_id: str,
     date_key: str,
     message_id: str,
-    openai_client,
+    gemini_client,
 ) -> Tuple[str, str]:
-    """Generate TTS audio via OpenAI and upload it directly to Firebase Storage.
+    """Generate TTS audio via Gemini and upload it directly to Firebase Storage.
 
     Returns:
         Tuple[path, audio_format]
@@ -58,11 +63,12 @@ def generate_tts_audio(
     if not script or not script.strip():
         raise ValueError("TTS script must be non-empty")
 
+    # Use .wav extension as Gemini returns raw audio which we wrap in WAV container
     blob, blob_name = create_audio_blob(
         user_id=user_id,
         date_key=date_key,
         message_id=message_id,
-        extension="mp3",
+        extension="wav",
     )
     if blob is None or blob_name is None:
         raise RuntimeError("Unable to access Firebase Storage bucket")
@@ -75,35 +81,47 @@ def generate_tts_audio(
         raise RuntimeError("Failed to verify Firebase Storage bucket") from exc
 
     try:
-        bytes_written = 0
-        with openai_client.audio.speech.with_streaming_response.create(
-            model="gpt-4o-mini-tts",
-            voice="sage",
-            response_format="mp3",
-            input=script,
-            instructions = """Voice Affect: Calm, composed, and reassuring; project quiet authority and confidence.\n\nTone: Sincere, empathetic, and gently authoritative—express genuine apology while conveying competence.\n\nPacing: Steady and moderate; unhurried enough to communicate care, yet efficient enough to demonstrate professionalism.\n\nEmotion: Genuine empathy and understanding; speak with warmth, especially during apologies (\"I'm very sorry for any disruption...\").\n\nPronunciation: Clear and precise, emphasizing key reassurances (\"smoothly,\" \"quickly,\" \"promptly\") to reinforce confidence.\n\nPauses: Brief pauses after offering assistance or requesting details, highlighting willingness to listen and support."""
-        ) as speech_response:
-            with blob.open(mode="wb", chunk_size=AUDIO_STREAM_CHUNK_SIZE) as writer:
-                for chunk in speech_response.iter_bytes(AUDIO_STREAM_CHUNK_SIZE):
-                    if not chunk:
-                        continue
-                    if isinstance(chunk, str):
-                        chunk = chunk.encode()
-                    writer.write(chunk)
-                    bytes_written += len(chunk)
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash-preview-tts",
+            contents=script,
+            config=types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name='Kore',
+                        )
+                    )
+                ),
+            )
+        )
+        
+        # Audio data from Gemini
+        if not response.candidates or not response.candidates[0].content.parts:
+             raise RuntimeError("Gemini TTS returned no content")
+             
+        audio_data = response.candidates[0].content.parts[0].inline_data.data
+        
+        # Prepare in-memory WAV file
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, "wb") as wf:
+            wf.setnchannels(1)  # Mono
+            wf.setsampwidth(2)  # 16-bit
+            wf.setframerate(24000) # 24kHz
+            wf.writeframes(audio_data)
+            
+        wav_data = wav_buffer.getvalue()
 
-        if bytes_written == 0:
-            try:
-                blob.delete()
-            except Exception:  # pragma: no cover - defensive cleanup
-                pass
-            raise RuntimeError("OpenAI TTS returned no audio content")
+        if not wav_data:
+             raise RuntimeError("Generated WAV data is empty")
+
+        blob.upload_from_string(wav_data, content_type="audio/wav")
 
         token = uuid.uuid4().hex
         blob.metadata = {"firebaseStorageDownloadTokens": token}
         blob.patch()
 
-        return blob_name, "mp3"
+        return blob_name, "wav"
     except Exception:
         try:
             blob.delete()
