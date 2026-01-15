@@ -1024,10 +1024,9 @@ async def chat_with_voice(
     # Load History
     chat_messages = await load_chat_history_from_firebase(user['uid'], db)
     
-    # System Prompt
-    system_instruction = "You are Avra, an expert astrologer and spiritual guide. You provide empathetic, insightful, and astrologically grounded advice on the user's birth chart."
-    if profile:
-             system_instruction += f" User Profile: {profile.get('birth_date')} {profile.get('city')}"
+    # Construct System Prompt & Context
+    (sys_msg, user_msg) = build_chat_context(profile)
+    system_instruction = f"{sys_msg}\n\n{user_msg}"
 
     gemini_history = build_gemini_chat_history(chat_messages)
     
