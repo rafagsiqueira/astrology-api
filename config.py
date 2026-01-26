@@ -49,42 +49,6 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
-class VertexAIAdapter:
-    """Adapter to make vertexai SDK look like google.genai Client."""
-    def __init__(self, project: str, location: str):
-        import vertexai
-        vertexai.init(project=project, location=location)
-        self.models = self
-        
-    def generate_content(self, model: str, contents, config=None, **kwargs):
-        from vertexai.generative_models import GenerativeModel, GenerationConfig
-        
-        # Handle system instruction from config
-        system_instruction = None
-        if config and hasattr(config, 'system_instruction'):
-            system_instruction = config.system_instruction
-            
-        gemini_model = GenerativeModel(model, system_instruction=system_instruction)
-        
-        # Build generation config
-        generation_config_args = {}
-        if config:
-            if hasattr(config, 'max_output_tokens'):
-                generation_config_args['max_output_tokens'] = config.max_output_tokens
-            if hasattr(config, 'response_mime_type'):
-                generation_config_args['response_mime_type'] = config.response_mime_type
-            if hasattr(config, 'response_schema'):
-                # Convert Pydantic model to JSON schema dict for Vertex AI
-                schema = config.response_schema
-                if hasattr(schema, 'model_json_schema'):
-                    generation_config_args['response_schema'] = schema.model_json_schema()
-                else:
-                    generation_config_args['response_schema'] = schema
-
-        return gemini_model.generate_content(
-            contents,
-            generation_config=GenerationConfig(**generation_config_args)
-        )
 
 def get_gemini_client():
     """Initialise the Google Gemini client if the API key is configured."""
@@ -106,8 +70,20 @@ def get_gemini_client():
                  logger.error("GEMINI_API_KEY not found, and PROJECT_ID/LOCATION not set for Vertex AI")
                  return None
 
-            logger.info(f"Using Vertex AI SDK with project={PROJECT_ID}, location={LOCATION}")
-            return VertexAIAdapter(project=PROJECT_ID, location=LOCATION)
+            logger.info(f"Using Vertex AI via google-genai SDK with project={PROJECT_ID}, location={LOCATION}")
+            # Patch SDK before use to fix timeout bug
+            from genai_patch import apply_patch
+            apply_patch()
+
+            from google import genai
+            from google.genai import types
+            
+            return genai.Client(
+                vertexai=True,
+                project=PROJECT_ID,
+                location=LOCATION,
+                http_options=types.HttpOptions(timeout=60000)
+            )
             
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.error(f"Failed to initialise Gemini client: {exc}")

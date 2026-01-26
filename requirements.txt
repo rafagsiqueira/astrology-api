@@ -18,3 +18,4 @@ pytest-asyncio==1.2.0
 app-store-server-library>=1.0.0
 python-multipart>=0.0.9
 google-cloud-aiplatform>=1.38.0
+google-genai>=0.3.0
