@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 # Environment variables
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')  # Add Gemini API Key
+PROJECT_ID = os.getenv('PROJECT_ID')
+LOCATION = os.getenv('LOCATION')
 FIRESTORE_DATABASE_ID = os.getenv('FIRESTORE_DATABASE_ID')
 WEATHERKIT_TEAM_ID = os.getenv('WEATHERKIT_TEAM_ID', 'F957AP9B34')
 WEATHERKIT_KEY_ID = os.getenv('WEATHERKIT_KEY_ID', '4PDNV2USTN')
@@ -72,6 +74,8 @@ def get_gemini_client():
             
             return genai.Client(
                 vertexai=True,
+                project=PROJECT_ID,
+                location=LOCATION,
                 http_options=types.HttpOptions(timeout=60000)
             )
     except Exception as exc:  # pragma: no cover - defensive logging
