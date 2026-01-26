@@ -73,12 +73,9 @@ def generate_tts_audio(
     if blob is None or blob_name is None:
         raise RuntimeError("Unable to access Firebase Storage bucket")
 
-    try:
-        if hasattr(blob, "bucket") and hasattr(blob.bucket, "exists"):
-            if not blob.bucket.exists():
-                raise RuntimeError("Firebase Storage bucket does not exist or access is denied")
-    except gcs_exceptions.GoogleCloudError as exc:  # pragma: no cover - network dependent
-        raise RuntimeError("Failed to verify Firebase Storage bucket") from exc
+    # Removed strict bucket existence check to avoid permission issues with Service Accounts
+    # that have Object Admin but not Bucket Get permissions.
+    # The upload operation itself will fail if access is denied.
 
     try:
         response = gemini_client.models.generate_content(
