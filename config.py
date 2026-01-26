@@ -62,7 +62,18 @@ def get_gemini_client():
                 http_options=types.HttpOptions(timeout=60000) 
             )
         else:
-            logger.warning("GEMINI_API_KEY not found in environment variables")
+            logger.info("GEMINI_API_KEY not found, attempting URL-less init (ADC/Vertex)")
+            # Patch SDK before use to fix timeout bug
+            from genai_patch import apply_patch
+            apply_patch()
+
+            from google import genai
+            from google.genai import types
+            
+            return genai.Client(
+                vertexai=True,
+                http_options=types.HttpOptions(timeout=60000)
+            )
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.error(f"Failed to initialise Gemini client: {exc}")
     return None
